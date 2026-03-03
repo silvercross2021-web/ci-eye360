@@ -1,0 +1,66 @@
+# ==========================================
+# ENVIRONNEMENT PYTHON & ENVIRONNEMENTS VIRTUELS
+# ==========================================
+venv/
+env/
+.env/
+ENV/
+env.bak/
+venv.bak/
+__pycache__/
+*.py[cod]
+*$py.class
+*.pyd
+
+# ==========================================
+# GESTION DES DEPENDANCES ET LOGGING
+# ==========================================
+*.log
+*.pot
+*.pyc
+logs/
+.log/
+
+# ==========================================
+# VARIABLES D'ENVIRONNEMENT ET SÉCURITÉ
+# ==========================================
+.env
+.env.local
+.env.development
+.env.production
+.env.*
+secret_keys.json
+
+# ==========================================
+# BASES DE DONNÉES & MEDIA
+# ==========================================
+*.sqlite3
+db.sqlite3
+*.db
+media/
+exports/
+data/
+*.csv
+*.xlsx
+*.zip
+
+# ==========================================
+# OUTILS DE DÉVELOPPEMENT & IDE
+# ==========================================
+.vscode/
+.idea/
+*.swp
+*.swo
+.DS_Store
+Thumbs.db
+
+# ==========================================
+# TESTS, COUVERTURE & AUTRES
+# ==========================================
+.pytest_cache/
+.coverage
+htmlcov/
+.tox/
+.nox/
+celerybeat-schedule
+*.pid

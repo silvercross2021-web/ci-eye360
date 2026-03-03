@@ -1,0 +1,653 @@
+<!DOCTYPE html>
+<html lang="fr">
+
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>CIV-Eye - Tactical Dashboard</title>
+
+    <!-- Leaflet CSS -->
+    <link rel="stylesheet" href="https://unpkg.com/leaflet@1.9.4/dist/leaflet.css" />
+    <!-- Font Awesome -->
+    <link rel="stylesheet" href="https://cdnjs.cloudflare.com/ajax/libs/font-awesome/6.4.0/css/all.min.css">
+    <!-- Google Fonts: Space Mono or JetBrains Mono for cyber look -->
+    <link href="https://fonts.googleapis.com/css2?family=JetBrains+Mono:wght@400;700&display=swap" rel="stylesheet">
+
+    <style>
+        :root {
+            --bg-color: #080808;
+            --neon-green: #00FF88;
+            --neon-red: #FF4444;
+            --neon-orange: #fd7e14;
+            --glass-bg: rgba(10, 10, 10, 0.7);
+            --border-color: rgba(0, 255, 136, 0.3);
+            --font-main: 'JetBrains Mono', monospace;
+        }
+
+        body,
+        html {
+            margin: 0;
+            padding: 0;
+            width: 100%;
+            height: 100%;
+            background-color: var(--bg-color);
+            color: var(--neon-green);
+            font-family: var(--font-main);
+            overflow: hidden;
+            font-size: 12px;
+        }
+
+        /* MAP FULL SCREEN */
+        #map {
+            position: absolute;
+            top: 0;
+            left: 0;
+            width: 100vw;
+            height: 100vh;
+            z-index: 1;
+            background-color: #040404;
+        }
+
+        /* GRID OVERLAY */
+        .grid-overlay {
+            position: absolute;
+            top: 0;
+            left: 0;
+            width: 100vw;
+            height: 100vh;
+            z-index: 2;
+            pointer-events: none;
+            background-image:
+                linear-gradient(rgba(0, 255, 136, 0.03) 1px, transparent 1px),
+                linear-gradient(90deg, rgba(0, 255, 136, 0.03) 1px, transparent 1px);
+            background-size: 40px 40px;
+            box-shadow: inset 0 0 150px rgba(0, 0, 0, 0.9);
+        }
+
+        /* UI ELEMENTS OVERLAY */
+        .ui-layer {
+            position: absolute;
+            z-index: 10;
+            pointer-events: none;
+            /* Let clicks pass through to map */
+            width: 100%;
+            height: 100%;
+        }
+
+        /* Make interactive bits clickable */
+        .interactive {
+            pointer-events: auto;
+        }
+
+        /* TOP NAV (Cyber Style) */
+        .cyber-nav {
+            position: absolute;
+            top: 0;
+            left: 0;
+            width: 100%;
+            display: flex;
+            justify-content: space-between;
+            align-items: center;
+            padding: 15px 30px;
+            background: transparent;
+            z-index: 1000;
+        }
+
+        .cyber-nav-left {
+            display: flex;
+            align-items: center;
+            gap: 10px;
+            color: var(--neon-green);
+            font-size: 14px;
+            font-weight: bold;
+            text-transform: uppercase;
+            letter-spacing: 2px;
+        }
+
+        .cyber-nav-center {
+            display: flex;
+            gap: -1px;
+        }
+
+        .cyber-nav-right {
+            display: flex;
+            align-items: center;
+            gap: 20px;
+            color: var(--neon-green);
+            font-size: 11px;
+        }
+
+        .cyber-nav-btn {
+            background: var(--glass-bg);
+            border: 1px solid var(--border-color);
+            color: rgba(0, 255, 136, 0.6);
+            padding: 8px 15px;
+            text-decoration: none;
+            text-transform: uppercase;
+            font-size: 12px;
+            letter-spacing: 1px;
+            backdrop-filter: blur(4px);
+            transition: 0.2s;
+            cursor: pointer;
+            display: inline-flex;
+            align-items: center;
+            gap: 5px;
+        }
+
+        .cyber-nav-btn:hover,
+        .cyber-nav-btn.active {
+            color: var(--neon-green) !important;
+            background: rgba(0, 255, 136, 0.1);
+            border: 1px solid var(--neon-green);
+            box-shadow: inset 0 0 10px rgba(0, 255, 136, 0.2);
+            z-index: 2;
+        }
+
+        .pulsing-dot-small {
+            width: 8px;
+            height: 8px;
+            background: var(--neon-green);
+            border-radius: 50%;
+            box-shadow: 0 0 10px var(--neon-green);
+            animation: pulse-green 2s infinite;
+        }
+
+        @keyframes pulse-green {
+            0% {
+                opacity: 1;
+                transform: scale(1);
+            }
+
+            50% {
+                opacity: 0.4;
+                transform: scale(1.3);
+            }
+
+            100% {
+                opacity: 1;
+                transform: scale(1);
+            }
+        }
+
+        /* LEFT SIDEBAR (Controls) */
+        .sidebar-left {
+            position: absolute;
+            top: 50%;
+            left: 20px;
+            transform: translateY(-50%);
+            display: flex;
+            flex-direction: column;
+            gap: 10px;
+        }
+
+        /* RIGHT SIDEBAR (Nav) */
+        .sidebar-right {
+            position: absolute;
+            top: 50%;
+            right: 20px;
+            transform: translateY(-50%);
+            display: flex;
+            flex-direction: column;
+            gap: 10px;
+        }
+
+        .cyber-btn {
+            width: 45px;
+            height: 45px;
+            background: var(--glass-bg);
+            border: 1px solid var(--border-color);
+            color: var(--neon-green);
+            display: flex;
+            align-items: center;
+            justify-content: center;
+            cursor: pointer;
+            backdrop-filter: blur(4px);
+            transition: all 0.2s;
+            position: relative;
+        }
+
+        .cyber-btn:hover,
+        .cyber-btn.active {
+            background: rgba(0, 255, 136, 0.1);
+            border-color: var(--neon-green);
+            box-shadow: 0 0 15px rgba(0, 255, 136, 0.4);
+            transform: scale(1.05);
+            color: white;
+        }
+
+        .cyber-btn.btn-red {
+            color: var(--neon-red);
+            border-color: rgba(255, 68, 68, 0.3);
+        }
+
+        .cyber-btn.btn-red:hover,
+        .cyber-btn.btn-red.active {
+            background: rgba(255, 68, 68, 0.1);
+            border-color: var(--neon-red);
+            box-shadow: 0 0 15px rgba(255, 68, 68, 0.4);
+            color: white;
+        }
+
+        .cyber-btn.btn-orange {
+            color: var(--neon-orange);
+            border-color: rgba(253, 126, 20, 0.3);
+        }
+
+        .cyber-btn.btn-orange:hover,
+        .cyber-btn.btn-orange.active {
+            background: rgba(253, 126, 20, 0.1);
+            border-color: var(--neon-orange);
+            box-shadow: 0 0 15px rgba(253, 126, 20, 0.4);
+            color: white;
+        }
+
+        /* Tooltip for buttons */
+        .cyber-btn::after {
+            content: attr(data-tooltip);
+            position: absolute;
+            left: 60px;
+            background: var(--glass-bg);
+            border: 1px solid var(--border-color);
+            padding: 5px 10px;
+            white-space: nowrap;
+            opacity: 0;
+            pointer-events: none;
+            transition: 0.2s;
+            text-transform: uppercase;
+        }
+
+        .sidebar-right .cyber-btn::after {
+            left: auto;
+            right: 60px;
+        }
+
+        .cyber-btn:hover::after {
+            opacity: 1;
+        }
+
+        /* BOTTOM TICKER */
+        .bottom-ticker {
+            position: absolute;
+            bottom: 0;
+            left: 0;
+            width: 100%;
+            height: 30px;
+            background: var(--glass-bg);
+            border-top: 1px solid var(--border-color);
+            display: flex;
+            align-items: center;
+            overflow: hidden;
+            backdrop-filter: blur(4px);
+        }
+
+        .live-indicator {
+            background: rgba(0, 0, 0, 0.8);
+            color: var(--neon-red);
+            padding: 0 20px;
+            height: 100%;
+            display: flex;
+            align-items: center;
+            font-weight: bold;
+            border-right: 1px solid var(--border-color);
+            z-index: 2;
+        }
+
+        .live-dot {
+            width: 8px;
+            height: 8px;
+            background: var(--neon-red);
+            border-radius: 50%;
+            margin-right: 10px;
+            box-shadow: 0 0 10px var(--neon-red);
+            animation: pulse-red 1.5s infinite;
+        }
+
+        @keyframes pulse-red {
+            0% {
+                opacity: 1;
+                transform: scale(1);
+            }
+
+            50% {
+                opacity: 0.4;
+                transform: scale(1.2);
+            }
+
+            100% {
+                opacity: 1;
+                transform: scale(1);
+            }
+        }
+
+        .ticker-content {
+            white-space: nowrap;
+            animation: ticker 40s linear infinite;
+            padding-left: 100%;
+        }
+
+        .ticker-content:hover {
+            animation-play-state: paused;
+        }
+
+        .ticker-item {
+            display: inline-block;
+            margin-right: 50px;
+            color: white;
+        }
+
+        .ticker-item span {
+            color: var(--neon-green);
+        }
+
+        @keyframes ticker {
+            0% {
+                transform: translate3d(0, 0, 0);
+            }
+
+            100% {
+                transform: translate3d(-100%, 0, 0);
+            }
+        }
+
+        /* CUSTOM LEAFLET POPUPS FOR CYBER THEME */
+        .leaflet-popup-content-wrapper {
+            background: var(--glass-bg);
+            border: 1px solid var(--border-color);
+            color: white;
+            border-radius: 0;
+            backdrop-filter: blur(4px);
+            font-family: var(--font-main);
+        }
+
+        .leaflet-popup-tip {
+            background: var(--glass-bg);
+            border: 1px solid var(--border-color);
+        }
+
+        .leaflet-container a.leaflet-popup-close-button {
+            color: var(--neon-green);
+        }
+
+        .cyber-link {
+            color: var(--neon-green);
+            text-decoration: none;
+            border: 1px solid var(--neon-green);
+            padding: 2px 8px;
+            display: inline-block;
+            margin-top: 5px;
+            transition: 0.2s;
+        }
+
+        .cyber-link:hover {
+            background: var(--neon-green);
+            color: black;
+        }
+
+        /* Stats Panel (Top Left) */
+        .stats-panel {
+            position: absolute;
+            top: 20px;
+            left: 20px;
+            background: var(--glass-bg);
+            border: 1px solid var(--border-color);
+            padding: 15px;
+            backdrop-filter: blur(4px);
+        }
+
+        .stat-line {
+            display: flex;
+            justify-content: space-between;
+            gap: 20px;
+            margin-bottom: 5px;
+        }
+
+        .stat-val {
+            color: white;
+            font-weight: bold;
+        }
+    </style>
+</head>
+
+<body>
+
+    <!-- BACKGROUND MAP -->
+    <div id="map"></div>
+    <div class="grid-overlay"></div>
+
+    <!-- FOREGROUND UI -->
+    <div class="ui-layer">
+
+        <!-- HEADER (Replaces Bootstrap Navbar) -->
+        <div class="cyber-nav interactive">
+            <div class="cyber-nav-left">
+                <div class="pulsing-dot-small"></div>
+                CIV-EYE COMMAND
+            </div>
+            <div class="cyber-nav-center">
+                <a href="{% url 'dashboard' %}" class="cyber-nav-btn active">LA CARTE</a>
+                <a href="{% url 'detections_list' %}" class="cyber-nav-btn">LA CHAÎNE (DÉTECTIONS)</a>
+                <a href="{% url 'zones_cadastrales' %}" class="cyber-nav-btn">LE CADASTRE</a>
+            </div>
+            <div class="cyber-nav-right">
+                <a href="/admin/" title="Administration" style="color:var(--neon-green)"><i class="fas fa-cog"></i></a>
+                <span
+                    style="border: 1px solid var(--border-color); padding: 5px 10px; backdrop-filter: blur(4px); background: var(--glass-bg);"
+                    id="live-clock-nav"></span>
+            </div>
+        </div>
+
+        <!-- STATS PANEL LEFT -->
+        <div class="stats-panel interactive">
+            <div
+                style="color:var(--neon-green); margin-bottom:10px; border-bottom:1px solid var(--border-color); padding-bottom:5px;">
+                > SYSTEM_STATUS
+            </div>
+            <div class="stat-line"><span>INFRACTIONS</span> <span class="stat-val" style="color:var(--neon-red)">{{
+                    detections_stats.detections_infraction }}</span></div>
+            <div class="stat-line"><span>INSPECTIONS</span> <span class="stat-val" style="color:var(--neon-orange)">{{
+                    detections_stats.detections_sous_condition }}</span></div>
+            <div class="stat-line"><span>CONFORMES</span> <span class="stat-val" style="color:var(--neon-green)">{{
+                    detections_stats.detections_conforme }}</span></div>
+        </div>
+
+        <!-- LEFT SIDEBAR (MAP CONTROLS) -->
+        <div class="sidebar-left interactive">
+            <div class="cyber-btn active" onclick="showAllDetections(); setActive(this)"
+                data-tooltip="TOUTES LES ALERTES">
+                <i class="fas fa-layer-group"></i>
+            </div>
+            <div class="cyber-btn btn-red" onclick="showRedAlerts(); setActive(this)"
+                data-tooltip="FILTRE: ROUGE (INFRACTION)">
+                <i class="fas fa-exclamation-triangle"></i>
+            </div>
+            <div class="cyber-btn btn-orange" onclick="showOrangeAlerts(); setActive(this)"
+                data-tooltip="FILTRE: ORANGE (INSPECTION)">
+                <i class="fas fa-eye"></i>
+            </div>
+        </div>
+
+        <!-- RIGHT SIDEBAR (NAVIGATION) -->
+        <div class="sidebar-right interactive">
+            <a href="{% url 'detections_list' %}" class="cyber-btn text-decoration-none"
+                data-tooltip="LISTE DES DÉTECTIONS">
+                <i class="fas fa-list"></i>
+            </a>
+            <a href="{% url 'zones_cadastrales' %}" class="cyber-btn text-decoration-none"
+                data-tooltip="ZONES CADASTRALES">
+                <i class="fas fa-map"></i>
+            </a>
+            <a href="/admin/" class="cyber-btn text-decoration-none" data-tooltip="ADMINISTRATION">
+                <i class="fas fa-cog"></i>
+            </a>
+        </div>
+
+        <!-- BOTTOM TICKER -->
+        <div class="bottom-ticker interactive">
+            <div class="live-indicator">
+                <div class="live-dot"></div> EN DIRECT
+            </div>
+            <div class="ticker-content">
+                {% for detection in dernieres_detections %}
+                <div class="ticker-item">
+                    > DÉTECTION <span>#{{ detection.id }}</span>
+                    [ {{ detection.alert_level|upper }} ]
+                    {% if detection.zone_cadastrale %} ZONE: {{ detection.zone_cadastrale.zone_id }} {% else %} HORS
+                    CADASTRE {% endif %}
+                    | {{ detection.date_detection|date:"d/m/Y H:i" }}
+                </div>
+                {% empty %}
+                <div class="ticker-item">> SYSTÈME EN ATTENTE DE NOUVELLES DÉTECTIONS...</div>
+                {% endfor %}
+            </div>
+        </div>
+
+    </div>
+
+    <!-- Leaflet JS -->
+    <script src="https://unpkg.com/leaflet@1.9.4/dist/leaflet.js"></script>
+    <script>
+        let map;
+        let detectionsLayer;
+        let zonesLayer;
+
+        function initMap() {
+            // Vue initiale centrée sur Treichville
+            map = L.map('map', {
+                zoomControl: false // Disable default zoom to match UI
+            }).setView([5.30, -4.00], 14);
+
+            // Google Maps Satellite Layout
+            L.tileLayer('https://mt1.google.com/vt/lyrs=s&x={x}&y={y}&z={z}', {
+                attribution: 'Tiles &copy; Google',
+                maxZoom: 20
+            }).addTo(map);
+
+            loadZonesCadastrales();
+            loadDetections();
+        }
+
+        function loadZonesCadastrales() {
+            fetch('/api/zones-geojson/')
+                .then(r => r.json())
+                .then(data => {
+                    zonesLayer = L.geoJSON(data, {
+                        style: function (feature) {
+                            return {
+                                fillColor: '#0088ff',
+                                weight: 1,
+                                opacity: 0.5,
+                                color: '#0088ff',
+                                fillOpacity: 0.1
+                            };
+                        }
+                    }).addTo(map);
+                });
+        }
+
+        function loadDetections() {
+            fetch('/api/detections-geojson/')
+                .then(r => r.json())
+                .then(data => {
+                    const alertColors = {
+                        'rouge': '#FF4444',
+                        'orange': '#fd7e14',
+                        'vert': '#00FF88',
+                        'veille': '#0dcaf0'
+                    };
+
+                    detectionsLayer = L.geoJSON(data, {
+                        style: function (feature) {
+                            const color = alertColors[feature.properties.alert_level] || '#888888';
+                            return {
+                                fillColor: color,
+                                color: color,
+                                weight: 2,
+                                opacity: 1,
+                                fillOpacity: 0.4
+                            };
+                        },
+                        onEachFeature: function (feature, layer) {
+                            const p = feature.properties;
+                            const lat = p.latitude != null ? p.latitude.toFixed(6) : 'N/A';
+                            const lon = p.longitude != null ? p.longitude.toFixed(6) : 'N/A';
+
+                            const gmapLink = (p.latitude && p.longitude) ?
+                                `<a href="https://www.google.com/maps/search/?api=1&query=${lat},${lon}" target="_blank" class="cyber-link mb-2" style="display:block; text-align:center;"><i class="fas fa-satellite"></i> GOOGLE MAPS</a>` : '';
+
+                            layer.bindPopup(`
+                                <div style="font-size:11px; padding:5px;">
+                                    <strong style="color:var(--neon-green)">[ DÉTECTION #${p.id} ]</strong><br><br>
+                                    STATUT: ${p.alert_label || p.status}<br>
+                                    ZONE: ${p.zone_name || 'HORS CADASTRE'}<br>
+                                    GPS: ${lat}, ${lon}<br><br>
+                                    ${gmapLink}
+                                    <button onclick="navigator.clipboard.writeText('${lat}, ${lon}').then(()=>alert('Coordonnées copiées !'))" class="cyber-btn" style="width:100%; height:30px; margin-bottom:10px; font-size:10px; color:var(--neon-green)">
+                                        <i class="fas fa-copy"></i> COPIER GPS
+                                    </button>
+                                    <a href="/detections/${p.id}/" class="cyber-link" style="width:100%; text-align:center; box-sizing:border-box; display:block;">>> INVESTIGUER</a>
+                                </div>
+                            `);
+                        }
+                    }).addTo(map);
+                });
+        }
+
+        function setActive(element) {
+            document.querySelectorAll('.sidebar-left .cyber-btn').forEach(btn => btn.classList.remove('active'));
+            element.classList.add('active');
+        }
+
+        function showAllDetections() {
+            if (detectionsLayer) {
+                detectionsLayer.eachLayer(layer => {
+                    layer.setStyle({ opacity: 1, fillOpacity: 0.4 });
+                });
+            }
+        }
+
+        function showRedAlerts() {
+            if (detectionsLayer) {
+                detectionsLayer.eachLayer(layer => {
+                    let isRed = layer.feature.properties.alert_level === 'rouge';
+                    layer.setStyle({
+                        opacity: isRed ? 1 : 0.05,
+                        fillOpacity: isRed ? 0.6 : 0.0
+                    });
+                });
+            }
+        }
+
+        function showOrangeAlerts() {
+            if (detectionsLayer) {
+                detectionsLayer.eachLayer(layer => {
+                    let isOrange = layer.feature.properties.alert_level === 'orange';
+                    layer.setStyle({
+                        opacity: isOrange ? 1 : 0.05,
+                        fillOpacity: isOrange ? 0.6 : 0.0
+                    });
+                });
+            }
+        }
+
+        document.addEventListener('DOMContentLoaded', initMap);
+    </script>
+    <script>
+        // Update live clock
+        function updateClock() {
+            const now = new Date();
+            const el = document.getElementById('live-clock-nav');
+            if (el) {
+                el.innerText = now.getUTCFullYear() + '/' +
+                    String(now.getUTCMonth() + 1).padStart(2, '0') + '/' +
+                    String(now.getUTCDate()).padStart(2, '0') + ' ' +
+                    String(now.getUTCHours()).padStart(2, '0') + ':' +
+                    String(now.getUTCMinutes()).padStart(2, '0') + ':' +
+                    String(now.getUTCSeconds()).padStart(2, '0') + ' UTC';
+            }
+        }
+        setInterval(updateClock, 1000);
+        updateClock();
+    </script>
+</body>
+
+</html>

@@ -1,0 +1,60 @@
+{% extends 'module1/base.html' %}
+
+{% block title %}Zones Cadastrales - CIV-Eye Module 1{% endblock %}
+
+{% block content %}
+<div class="row mb-4">
+    <div class="col-12">
+        <h1 class="h3 mb-3"><i class="fas fa-map"></i> Zones Cadastrales</h1>
+    </div>
+</div>
+
+<div class="row">
+    <div class="col-12">
+        <div class="card">
+            <div class="card-body">
+                <table class="table table-hover mb-0">
+                    <thead class="table-light">
+                        <tr>
+                            <th>Département</th>
+                            <th>Section</th>
+                            <th>Parcelle</th>
+                            <th>Statut Constructibilité</th>
+                            <th>Surface estimée (m²)</th>
+                            <th>Nombre de détections</th>
+                            <th>Actions</th>
+                        </tr>
+                    </thead>
+                    <tbody>
+                        {% for zone in zones %}
+                        <tr>
+                            <td>{{ zone.department }}</td>
+                            <td>{{ zone.section }}</td>
+                            <td>{{ zone.parcel_id }}</td>
+                            <td>
+                                <span
+                                    class="badge {% if zone.buildable_status == 'buildable' %}bg-success{% elif zone.buildable_status == 'conditional' %}bg-warning{% else %}bg-danger{% endif %}">
+                                    {{ zone.get_buildable_status_display }}
+                                </span>
+                            </td>
+                            <td>{% if zone.surface_m2 %}{{ zone.surface_m2|floatformat:0 }} m²{% else %}-{% endif %}
+                            </td>
+                            <td>{{ zone.detection_count }}</td>
+                            <td>
+                                <a href="{% url 'zone_detail' zone.zone_id %}" class="btn btn-sm btn-outline-primary">
+                                    <i class="fas fa-eye"></i> Voir
+                                </a>
+                            </td>
+                        </tr>
+                        {% empty %}
+                        <tr>
+                            <td colspan="7" class="text-center text-muted py-4">Aucune zone cadastrale trouvée.</td>
+                        </tr>
+                        {% endfor %}
+                    </tbody>
+                </table>
+            </div>
+        </div>
+    </div>
+</div>
+{% endblock %}

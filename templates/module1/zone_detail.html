@@ -1,0 +1,73 @@
+{% extends 'module1/base.html' %}
+
+{% block title %}Zone {{ zone.zone_id }} - CIV-Eye Module 1{% endblock %}
+
+{% block content %}
+<div class="row mb-4">
+    <div class="col-12">
+        <nav aria-label="breadcrumb">
+            <ol class="breadcrumb">
+                <li class="breadcrumb-item"><a href="{% url 'dashboard' %}">Dashboard</a></li>
+                <li class="breadcrumb-item"><a href="{% url 'zones_cadastrales' %}">Zones</a></li>
+                <li class="breadcrumb-item active">Zone {{ zone.zone_id }}</li>
+            </ol>
+        </nav>
+        <h1 class="h3 mb-3">
+            <i class="fas fa-map-marker-alt text-primary"></i> Zone Cadastrale : {{ zone.name }}
+        </h1>
+    </div>
+</div>
+
+<div class="row">
+    <div class="col-md-6">
+        <div class="card mb-4 shadow-sm">
+            <div class="card-header">
+                <h5 class="mb-0"><i class="fas fa-info-circle"></i> Informations</h5>
+            </div>
+            <div class="card-body">
+                <p><strong>Identifiant :</strong> {{ zone.zone_id }}</p>
+                <p><strong>Nom :</strong> {{ zone.name }}</p>
+                <p><strong>Région :</strong> {{ zone.region }}</p>
+                <p><strong>Département :</strong> {{ zone.department }}</p>
+                <p><strong>Statut de constructibilité :</strong>
+                    <span
+                        class="badge {% if zone.buildable_status == 'buildable' %}bg-success{% elif zone.buildable_status == 'conditional' %}bg-warning{% else %}bg-danger{% endif %}">
+                        {{ zone.get_buildable_status_display }}
+                    </span>
+                </p>
+                <p><strong>Surface :</strong> {% if zone.surface_m2 %}{{ zone.surface_m2|floatformat:0 }} m²{% else
+                    %}-{% endif %}</p>
+            </div>
+        </div>
+    </div>
+
+    <div class="col-md-6">
+        <div class="card mb-4 shadow-sm">
+            <div class="card-header">
+                <h5 class="mb-0"><i class="fas fa-list"></i> Détections associées ({{ detection_count }})</h5>
+            </div>
+            <div class="card-body p-0">
+                <div class="list-group list-group-flush">
+                    {% for detection in detections %}
+                    <a href="{% url 'detection_detail' detection.id %}" class="list-group-item list-group-item-action">
+                        <div class="d-flex w-100 justify-content-between">
+                            <h6 class="mb-1">Détection #{{ detection.id }}</h6>
+                            <small>{{ detection.date_detection|date:"d/m/Y H:i" }}</small>
+                        </div>
+                        <p class="mb-1">Statut: {{ detection.get_status_display }}</p>
+                        <small>
+                            <span
+                                class="badge {% if detection.alert_level == 'rouge' %}bg-danger{% elif detection.alert_level == 'orange' %}bg-warning{% elif detection.alert_level == 'vert' %}bg-success{% else %}bg-info{% endif %}">
+                                {{ detection.alert_level|title }}
+                            </span>
+                        </small>
+                    </a>
+                    {% empty %}
+                    <div class="p-3 text-muted text-center">Aucune détection pour cette zone.</div>
+                    {% endfor %}
+                </div>
+            </div>
+        </div>
+    </div>
+</div>
+{% endblock %}

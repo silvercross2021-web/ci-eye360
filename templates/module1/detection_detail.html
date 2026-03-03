@@ -1,0 +1,461 @@
+{% extends 'module1/base.html' %}
+
+{% block title %}Détection #{{ detection.id }} - CIV-Eye Module 1{% endblock %}
+
+{% block content %}
+<div class="row mb-4">
+    <div class="col-12">
+        <nav aria-label="breadcrumb">
+            <ol class="breadcrumb">
+                <li class="breadcrumb-item"><a href="{% url 'dashboard' %}">Dashboard</a></li>
+                <li class="breadcrumb-item"><a href="{% url 'detections_list' %}">Détections</a></li>
+                <li class="breadcrumb-item active">Détection #{{ detection.id }}</li>
+            </ol>
+        </nav>
+
+        <h1 class="h3 mb-3">
+            <i
+                class="fas fa-exclamation-triangle {% if detection.alert_level == 'rouge' %}text-danger{% elif detection.alert_level == 'orange' %}text-warning{% elif detection.alert_level == 'vert' %}text-success{% else %}text-info{% endif %}"></i>
+            Détection #{{ detection.id }}
+        </h1>
+    </div>
+</div>
+
+<!-- Carte et Détails -->
+<div class="row">
+    <div class="col-md-8">
+        <div class="card">
+            <div class="card-header d-flex justify-content-between align-items-center">
+                <h5 class="mb-0"><i class="fas fa-map-marked-alt"></i> Localisation</h5>
+                {% if detection.latitude and detection.longitude %}
+                <div>
+                    <span class="badge bg-secondary me-2"><i class="fas fa-crosshairs"></i> {{
+                        detection.latitude|floatformat:6 }}, {{ detection.longitude|floatformat:6 }}</span>
+                    <button class="btn btn-sm btn-outline-primary"
+                        onclick="navigator.clipboard.writeText('{{ detection.latitude|floatformat:6 }}, {{ detection.longitude|floatformat:6 }}').then(() => alert('Coordonnées copiées !'))">
+                        <i class="fas fa-copy"></i> Copier
+                    </button>
+                    <a href="https://www.google.com/maps/search/?api=1&query={{ detection.latitude|floatformat:6 }},{{ detection.longitude|floatformat:6 }}"
+                        target="_blank" class="btn btn-sm btn-primary">
+                        <i class="fas fa-satellite"></i> Google Maps
+                    </a>
+                </div>
+                {% endif %}
+            </div>
+            <div class="card-body p-0">
+                <div id="detail-map" style="height: 400px;"></div>
+            </div>
+        </div>
+    </div>
+
+    <div class="col-md-4">
+        <!-- Informations principales -->
+        <div class="card mb-3">
+            <div class="card-header">
+                <h5 class="mb-0"><i class="fas fa-info-circle"></i> Informations</h5>
+            </div>
+            <div class="card-body">
+                <div class="mb-3">
+                    <label class="form-label text-muted">Statut</label>
+                    <div>
+                        <span
+                            class="badge {% if detection.alert_level == 'rouge' %}bg-danger{% elif detection.alert_level == 'orange' %}bg-warning{% elif detection.alert_level == 'vert' %}bg-success{% else %}bg-info{% endif %} fs-6">
+                            {{ detection.alert_level|title }}
+                        </span>
+                    </div>
+                </div>
+
+                <div class="mb-3">
+                    <label class="form-label text-muted">Classification</label>
+                    <div>
+                        <span class="badge bg-secondary fs-6">
+                            {{ detection.get_status_display }}
+                        </span>
+                    </div>
+                </div>
+
+                <div class="mb-3">
+                    <label class="form-label text-muted">Date de détection</label>
+                    <div class="fw-bold">
+                        {{ detection.date_detection|date:"d/m/Y H:i" }}
+                    </div>
+                </div>
+
+                {% if detection.zone_cadastrale %}
+                <div class="mb-3">
+                    <label class="form-label text-muted">Zone Cadastrale</label>
+                    <div>
+                        <a href="{% url 'zone_detail' detection.zone_cadastrale.zone_id %}"
+                            class="text-decoration-none">
+                            <strong>{{ detection.zone_cadastrale.zone_id }}</strong><br>
+                            <small class="text-muted">{{ detection.zone_cadastrale.name }}</small>
+                        </a>
+                    </div>
+                </div>
+                {% endif %}
+
+                {% if detection.verification_required %}
+                <div class="alert alert-warning">
+                    <i class="fas fa-exclamation-triangle"></i>
+                    <strong>Vérification requise</strong>
+                </div>
+                {% endif %}
+            </div>
+        </div>
+
+        <!-- Données techniques -->
+        <div class="card mb-3">
+            <div class="card-header">
+                <h5 class="mb-0"><i class="fas fa-chart-line"></i> Données Techniques</h5>
+            </div>
+            <div class="card-body">
+                <div class="row mb-3">
+                    <div class="col-6">
+                        <label class="form-label text-muted">NDBI T1 (2024)</label>
+                        <div class="fw-bold">
+                            <code>{{ detection.ndbi_t1|floatformat:3 }}</code>
+                        </div>
+                    </div>
+                    <div class="col-6">
+                        <label class="form-label text-muted">NDBI T2 (2025)</label>
+                        <div class="fw-bold">
+                            <code>{{ detection.ndbi_t2|floatformat:3 }}</code>
+                        </div>
+                    </div>
+                </div>
+
+                {% if detection.bsi_value %}
+                <div class="row mb-3">
+                    <div class="col-12">
+                        <label class="form-label text-muted">BSI (Bare Soil Index)</label>
+                        <div class="fw-bold">
+                            <code>{{ detection.bsi_value|floatformat:3 }}</code>
+                        </div>
+                    </div>
+                </div>
+                {% endif %}
+
+                <div class="row mb-3">
+                    <div class="col-6">
+                        <label class="form-label text-muted">Surface</label>
+                        <div class="fw-bold">
+                            {% if detection.surface_m2 %}
+                            {{ detection.surface_m2|floatformat:0 }} m²
+                            {% else %}
+                            <span class="text-muted">-</span>
+                            {% endif %}
+                        </div>
+                    </div>
+                    <div class="col-6">
+                        <label class="form-label text-muted">Confiance</label>
+                        <div class="fw-bold">
+                            <div class="progress" style="height: 20px;">
+                                <div class="progress-bar {% if detection.confidence > 0.7 %}bg-success{% elif detection.confidence > 0.5 %}bg-warning{% else %}bg-danger{% endif %}"
+                                    data-width-percent="{% widthratio detection.confidence 1 100 %}">
+                                    {% widthratio detection.confidence 1 100 %}%
+                                </div>
+                            </div>
+                        </div>
+                    </div>
+                </div>
+
+                <div class="row">
+                    <div class="col-6">
+                        <label class="form-label text-muted">Présent T1</label>
+                        <div>
+                            {% if detection.present_in_t1_sentinel %}
+                            <span class="badge bg-warning">Oui</span>
+                            {% else %}
+                            <span class="badge bg-success">Non</span>
+                            {% endif %}
+                        </div>
+                    </div>
+                    <div class="col-6">
+                        <label class="form-label text-muted">Présent Microsoft</label>
+                        <div>
+                            {% if detection.present_in_microsoft %}
+                            <span class="badge bg-warning">Oui</span>
+                            {% else %}
+                            <span class="badge bg-success">Non</span>
+                            {% endif %}
+                        </div>
+                    </div>
+                </div>
+            </div>
+        </div>
+
+        <!-- CORRECTIF C2 : Bouton Traiter câblé à l'API /api/v1/detections/{id}/traiter/ -->
+        <div class="card">
+            <div class="card-header">
+                <h5 class="mb-0"><i class="fas fa-tools"></i> Actions Agent Terrain</h5>
+            </div>
+            <div class="card-body">
+                <div class="d-grid gap-2 mb-3">
+                    <a href="{% url 'detections_list' %}" class="btn btn-outline-secondary">
+                        <i class="fas fa-arrow-left"></i> Retour à la liste
+                    </a>
+                    <button class="btn btn-outline-info" onclick="exportDetection()">
+                        <i class="fas fa-download"></i> Exporter cette détection
+                    </button>
+                </div>
+
+                {% if is_traitement_pending %}
+                <!-- Formulaire de traitement terrain -->
+                <hr>
+                <h6 class="text-muted"><i class="fas fa-clipboard-check"></i> Traitement terrain</h6>
+                <div class="mb-3">
+                    <label for="input-commentaire" class="form-label">Commentaire <span
+                            class="text-danger">*</span></label>
+                    <textarea id="input-commentaire" class="form-control" rows="3"
+                        placeholder="Décrivez votre observation terrain (obligatoire pour confirmer ou rejeter)..."></textarea>
+                </div>
+                <div class="d-grid gap-2">
+                    <button class="btn btn-success" onclick="traiterDetection('confirme')">
+                        <i class="fas fa-check-circle"></i> Confirmer la détection
+                    </button>
+                    <button class="btn btn-warning" onclick="traiterDetection('en_investigation')">
+                        <i class="fas fa-search"></i> Mettre en investigation
+                    </button>
+                    <button class="btn btn-outline-secondary" onclick="traiterDetection('faux_positif')">
+                        <i class="fas fa-times-circle"></i> Faux positif
+                    </button>
+                </div>
+                {% else %}
+                <div class="alert alert-success">
+                    <i class="fas fa-check"></i>
+                    <strong>Traité</strong> : {{ detection.get_statut_traitement_display }}
+                    {% if detection.date_traitement %}
+                    <br><small>Le {{ detection.date_traitement|date:"d/m/Y à H:i" }}</small>
+                    {% endif %}
+                    {% if detection.traitee_par %}
+                    <br><small>Par : {{ detection.traitee_par }}</small>
+                    {% endif %}
+                </div>
+                {% if detection.commentaire_terrain %}
+                <div class="alert alert-light border mt-2">
+                    <i class="fas fa-comment"></i> {{ detection.commentaire_terrain }}
+                </div>
+                {% endif %}
+                {% endif %}
+            </div>
+        </div>
+    </div>
+</div>
+
+<!-- Analyse et Recommandations -->
+<div class="row mt-4">
+    <div class="col-12">
+        <div class="card">
+            <div class="card-header">
+                <h5 class="mb-0"><i class="fas fa-brain"></i> Analyse et Recommandations</h5>
+            </div>
+            <div class="card-body">
+                <div class="row">
+                    <div class="col-md-6">
+                        <h6><i class="fas fa-search"></i> Analyse du changement</h6>
+                        <p class="text-muted">
+                            {% if ndbi_increased %}
+                            Augmentation significative de l'indice NDBI, indiquant une nouvelle construction.
+                            {% else %}
+                            Changement modéré détecté.
+                            {% endif %}
+                        </p>
+
+                        {% if detection.zone_cadastrale %}
+                        <h6><i class="fas fa-gavel"></i> Conformité au zonage</h6>
+                        <p class="text-muted">
+                            {% if detection.zone_cadastrale.buildable_status == 'forbidden' %}
+                            <strong class="text-danger">Zone interdite à la construction.</strong>
+                            {% elif detection.zone_cadastrale.buildable_status == 'conditional' %}
+                            <strong class="text-warning">Zone sous condition.</strong>
+                            {% else %}
+                            <strong class="text-success">Zone constructible.</strong>
+                            {% endif %}
+                        </p>
+                        {% endif %}
+
+                        <!-- CORRECTIF C1 : Disclaimer juridique obligatoire (plan v2.0 Phase 6.3) -->
+                        {% if detection.alert_level == 'rouge' or detection.alert_level == 'orange' %}
+                        <div class="alert alert-warning border-2 border-warning mt-3" role="alert">
+                            <div class="d-flex align-items-start gap-2">
+                                <i class="fas fa-balance-scale fa-lg text-warning mt-1 flex-shrink-0"></i>
+                                <div>
+                                    <strong>⚠️ Avertissement Juridique Obligatoire</strong>
+                                    <p class="mb-0 small mt-1">
+                                        Ce diagnostic est produit automatiquement à partir du Plan de
+                                        Zonage Urbanistique <strong>V10 de Treichville</strong> et
+                                        d'images satellite Sentinel-2 (T1 : 29 jan. 2024 /
+                                        T2 : 13 jan. 2025).
+                                        Il <strong>ne constitue pas une qualification juridique</strong>
+                                        d'infraction urbanistique. La vérification terrain et la
+                                        décision formelle relèvent exclusivement de l'agent cadastral
+                                        habilité.
+                                    </p>
+                                </div>
+                            </div>
+                        </div>
+                        {% endif %}
+                    </div>
+
+                    <div class="col-md-6">
+                        <h6><i class="fas fa-clipboard-check"></i> Recommandations</h6>
+                        <ul class="list-unstyled">
+                            {% if detection.alert_level == 'rouge' %}
+                            <li><i class="fas fa-exclamation-triangle text-danger"></i> Transmission immédiate à l'agent
+                                cadastral</li>
+                            <li><i class="fas fa-camera text-danger"></i> Photographies aériennes recommandées</li>
+                            {% elif detection.alert_level == 'orange' %}
+                            <li><i class="fas fa-eye text-warning"></i> Inspection visuelle requise</li>
+                            {% elif detection.alert_level == 'vert' %}
+                            <li><i class="fas fa-check text-success"></i> Aucune action immédiate requise</li>
+                            {% else %}
+                            <li><i class="fas fa-binoculars text-info"></i> Surveillance active</li>
+                            {% endif %}
+                        </ul>
+                    </div>
+                </div>
+            </div>
+        </div>
+    </div>
+</div>
+{% endblock %}
+
+{% block extra_js %}
+<script>
+    // Variables Django passées à JavaScript
+    const detectionData = {
+        id: parseInt("{{ detection.id }}", 10),
+        geometry: JSON.parse("{{ geometry|escapejs }}" || "null"),
+        zoneGeometry: JSON.parse("{{ zone_geometry|escapejs }}" || "null"),
+        dateDetection: '{{ detection.date_detection|date:"Y-m-d" }}'
+    };
+
+    // CORRECTIF C3 : La détection est un Polygon GeoJSON (pas un Point).
+    // On utilise style au lieu de pointToLayer pour que la géométrie apparaisse.
+    function initDetailMap() {
+        const map = L.map('detail-map').setView([5.30, -4.00], 15);
+
+        L.tileLayer('https://mt1.google.com/vt/lyrs=s&x={x}&y={y}&z={z}', {
+            attribution: 'Tiles &copy; Google',
+            maxZoom: 20
+        }).addTo(map);
+
+        // Couleur selon niveau d'alerte
+        const alertColorMap = {
+            'rouge': '#dc3545', 'orange': '#fd7e14',
+            'vert': '#198754', 'veille': '#0dcaf0'
+        };
+        const alertLevel = '{{ detection.alert_level }}';
+        const fillColor = alertColorMap[alertLevel] || '#888888';
+
+        // Ajouter la détection (Polygon) avec style colorisé
+        if (detectionData.geometry) {
+            const detectionLayer = L.geoJSON(detectionData.geometry, {
+                style: {
+                    fillColor: fillColor,
+                    color: '#fff',
+                    weight: 3,
+                    opacity: 1,
+                    fillOpacity: 0.3
+                }
+            }).addTo(map);
+            map.fitBounds(detectionLayer.getBounds(), { maxZoom: 20 });
+        }
+
+        // Ajouter la zone cadastrale
+        if (detectionData.zoneGeometry) {
+            L.geoJSON(detectionData.zoneGeometry, {
+                style: {
+                    fillColor: '#3388ff',
+                    weight: 2,
+                    opacity: 0.8,
+                    color: 'white',
+                    fillOpacity: 0.2
+                }
+            }).addTo(map);
+        }
+    }
+
+    // CORRECTIF C2 : Fonction câblée à l'API /api/v1/detections/{id}/traiter/
+    async function traiterDetection(nouveauStatut) {
+        const commentaire = document.getElementById('input-commentaire')?.value?.trim() || '';
+
+        if (['confirme', 'faux_positif'].includes(nouveauStatut) && !commentaire) {
+            alert('Un commentaire est obligatoire pour confirmer ou marquer comme faux positif.');
+            return;
+        }
+
+        // Récupération du token CSRF depuis le cookie
+        const csrfToken = document.cookie
+            .split('; ')
+            .find(row => row.startsWith('csrftoken='))
+            ?.split('=')[1] || '';
+
+        try {
+            const response = await fetch(`/api/v1/detections/${detectionData.id}/traiter/`, {
+                method: 'PATCH',
+                headers: {
+                    'Content-Type': 'application/json',
+                    'X-CSRFToken': csrfToken
+                },
+                body: JSON.stringify({
+                    statut_traitement: nouveauStatut,
+                    commentaire_terrain: commentaire
+                })
+            });
+
+            const data = await response.json();
+            if (response.ok) {
+                // Rechargement de la page pour reflet du nouveau statut
+                window.location.reload();
+            } else {
+                alert('Erreur API : ' + JSON.stringify(data));
+            }
+        } catch (e) {
+            alert('Erreur réseau : ' + e.message);
+        }
+    }
+
+    function markForVerification() {
+        // Appel vers traiterDetection pour compatibilité ascendante
+        traiterDetection('en_investigation');
+    }
+
+    function exportDetection() {
+        const data = {
+            id: detectionData.id,
+            date: detectionData.dateDetection,
+            status: '{{ detection.status }}',
+            alert_level: '{{ detection.alert_level }}',
+            ndbi_t1: parseFloat("{{ detection.ndbi_t1|default:0 }}"),
+            ndbi_t2: parseFloat("{{ detection.ndbi_t2|default:0 }}"),
+            bsi: parseFloat("{{ detection.bsi_value|default:0 }}") || null,
+            surface_m2: parseFloat("{{ detection.surface_m2|default:0 }}") || null,
+            confidence: parseFloat("{{ detection.confidence }}"),
+            zone_id: '{{ detection.zone_cadastrale.zone_id|default:"" }}',
+            zone_name: '{{ detection.zone_cadastrale.name|default:"" }}'
+        };
+
+        const blob = new Blob([JSON.stringify(data, null, 2)], { type: 'application/json' });
+        const url = window.URL.createObjectURL(blob);
+
+        const a = document.createElement('a');
+        a.href = url;
+        a.download = `detection-${detectionData.id}-${detectionData.dateDetection}.json`;
+        document.body.appendChild(a);
+        a.click();
+        document.body.removeChild(a);
+        window.URL.revokeObjectURL(url);
+    }
+
+    // Initialiser au chargement
+    document.addEventListener('DOMContentLoaded', () => {
+        initDetailMap();
+        document.querySelectorAll('.progress-bar').forEach(bar => {
+            if (bar.dataset.widthPercent) {
+                bar.style.width = bar.dataset.widthPercent + '%';
+            }
+        });
+    });
+</script>
+{% endblock %}

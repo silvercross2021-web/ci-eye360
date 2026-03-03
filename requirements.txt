@@ -1,0 +1,49 @@
+# ==============================================================================
+# CIV-EYE COMMAND CENTER - SYSTEM REQUIREMENTS
+# Fichier généré automatiquement pour le déploiement en production & développement
+# ==============================================================================
+
+# --- FRAMEWORK CORE 🚀 ---
+Django==5.0.3                 # Framework Web Backend
+djangorestframework==3.15.1   # Création des APIs RESTful
+django-cors-headers==4.3.1    # Gestion des règles CORS
+django-filter==24.1           # Système de filtrage avancé pour l'API REST
+
+# --- OUTILS DE PRODUCTION 🛡️ ---
+gunicorn==21.2.0              # Serveur WSGI de Production Hautes Performances
+whitenoise==6.6.0             # Serveur de fichiers statiques (StaticFiles)
+python-dotenv==1.0.1          # Sécurité : Chargement des clés et DB dans le .env
+sentry-sdk==1.42.0            # Télémétrie et suivi des crashs en live
+django-extensions==3.2.3      # Scripts admin supplémentaires (shell_plus, etc.)
+
+# --- BASE DE DONNÉES & GÉOSPATIAL POSTGIS 🌍 ---
+psycopg2-binary==2.9.9        # Driver Officiel PostgreSQL/PostGIS
+GDAL==3.8.4                   # Moteur de conversion et traitement SIG
+GEOS==3.11.2                  # Moteur Géométrique de PostGIS
+Shapely==2.0.3                # Manipulation géométrique en Python (Centroïdes)
+GeoPandas==0.14.3             # Gestion asynchrone des Dataframes Géospatiaux
+Fiona==1.9.6                  # Driver de lecture des fichiers SIG
+pyproj==3.6.1                 # Transformateur CRS et Projections cartographiques
+rasterio==1.3.9               # Analyse et Découpe de Rasters (Images Satellitaires)
+
+# --- ANALYSE DE L'IMAGE ET IA 🧠 ---
+numpy==1.26.4                 # Calcul matriciel algorithmique
+scipy==1.12.0                 # Fonctions géospatiales pointues (NDBI, BSI)
+scikit-image==0.22.0          # Algorithmes de reconnaissance de construction
+opencv-python-headless==4.9.0.80 # Traitement des Pixels rapide spécial serveur
+Pillow==10.2.0                # Manipulation visuelle légère (Miniatures)
+
+# --- COMMUNICATION ET QUEUES DE MESSAGES 📨 ---
+celery==5.3.6                 # Serveur de tâches asynchrones pour traitements lourds
+redis==5.0.3                  # Base de données In-Memory (Cache & Broker Celery)
+requests==2.31.0              # Requêtes HTTP externes (API Sentinel/Microsoft)
+
+# --- INTERFACE ET MULTIMEDIA 🎨 ---
+folium==0.15.1                # Générateur de visualisations LeafletJS Backend
+weasyprint==61.2              # Exportateur natif PDF des Rapports d'Inspections
+
+# --- TESTS ET DÉVELOPPEMENT 🧪 ---
+pytest==8.1.1                 # Moteur d'exécution des tests
+pytest-django==4.8.0          # Bridge de tests Django
+black==24.3.0                 # Formateur de code automatique strict
+flake8==7.0.0                 # Linter de respect des standards de propreté PEP8

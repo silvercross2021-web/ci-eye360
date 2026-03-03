@@ -1,0 +1,258 @@
+<!DOCTYPE html>
+<html lang="fr">
+<head>
+<meta charset="UTF-8">
+<meta name="viewport" content="width=device-width,initial-scale=1.0">
+<title>CIV-Eye · Cadastre Treichville V10</title>
+<link rel="stylesheet" href="https://cdnjs.cloudflare.com/ajax/libs/leaflet/1.9.4/leaflet.min.css"/>
+<style>
+*{margin:0;padding:0;box-sizing:border-box}
+html,body{height:100%;font-family:'Segoe UI',system-ui,sans-serif;background:#0d1117;color:#e6edf3}
+#app{display:flex;flex-direction:column;height:100vh}
+#entete{padding:8px 16px;background:linear-gradient(90deg,#0d1117,#161b22);border-bottom:1px solid #21262d;display:flex;align-items:center;gap:10px;flex-shrink:0;flex-wrap:wrap}
+#entete h1{font-size:14px;font-weight:700}
+.etiq{font-size:9px;padding:2px 7px;border-radius:8px;font-weight:700;letter-spacing:.04em}
+.v10{background:#0d2030;color:#58a6ff;border:1px solid #58a6ff}
+.rfc{background:#0d2010;color:#3fb950;border:1px solid #3fb950}
+.audit{background:#1a0d30;color:#c084fc;border:1px solid #c084fc}
+.geo{background:#1a1500;color:#fbbf24;border:1px solid #fbbf24}
+.corr{background:#1a1a00;color:#f97316;border:1px solid #f97316}
+#principal{display:flex;flex:1;overflow:hidden}
+#carte{flex:1}
+#panneau{width:290px;background:#161b22;border-left:1px solid #21262d;overflow-y:auto;padding:11px;flex-shrink:0;font-size:12px}
+
+.sgrid{display:grid;grid-template-columns:repeat(3,1fr);gap:4px;margin-bottom:10px}
+.sc{background:#0d1117;border:1px solid #21262d;border-radius:5px;padding:7px 4px;text-align:center}
+.sn{font-size:20px;font-weight:700;line-height:1}
+.sl{font-size:8px;color:#6e7681;margin-top:2px;text-transform:uppercase;letter-spacing:.06em}
+
+.sec{font-size:9px;font-weight:700;color:#388bfd;text-transform:uppercase;letter-spacing:.12em;margin:10px 0 5px;display:flex;align-items:center;gap:5px}
+.sec::after{content:'';flex:1;height:1px;background:#21262d}
+
+.ftabs{display:flex;gap:3px;margin-bottom:8px;flex-wrap:wrap}
+.ftab{flex:1;min-width:60px;padding:4px;border-radius:4px;border:1px solid #30363d;background:transparent;color:#8b949e;font-size:10px;cursor:pointer;text-align:center;transition:all .15s;font-family:inherit}
+.ftab:hover{border-color:#58a6ff;color:#58a6ff}
+.ftab.on{border-color:transparent;color:#fff;font-weight:600}
+.ftab.on.f-tout{background:#388bfd}
+.ftab.on.f-interdit{background:#b91c1c}
+.ftab.on.f-conditionnel{background:#b45309}
+.ftab.on.f-constructible{background:#15803d}
+
+.legrow{display:flex;align-items:center;gap:7px;padding:3px 0}
+.ld{width:12px;height:12px;border-radius:2px;flex-shrink:0}
+.lt{font-size:10px;color:#c9d1d9}
+.ln{margin-left:auto;font-size:9px;color:#6e7681}
+
+#ib{background:#0d1117;border-radius:6px;padding:10px;border:1px solid #21262d;min-height:80px}
+.hint{color:#484f58;font-size:10px;text-align:center;padding:18px 0;font-style:italic;line-height:1.6}
+.ibadge{display:inline-flex;align-items:center;gap:5px;padding:3px 10px;border-radius:8px;font-size:9px;font-weight:700;margin-bottom:7px;text-transform:uppercase;letter-spacing:.04em}
+.ib-interdit{background:rgba(185,28,28,.15);color:#f87171;border:1px solid rgba(248,113,113,.3)}
+.ib-conditionnel{background:rgba(180,83,9,.15);color:#fbbf24;border:1px solid rgba(251,191,36,.3)}
+.ib-constructible{background:rgba(21,128,61,.15);color:#4ade80;border:1px solid rgba(74,222,128,.3)}
+.iname{font-size:12px;font-weight:600;margin-bottom:4px;line-height:1.3}
+.idesc{font-size:10px;color:#6e7681;margin-bottom:8px;line-height:1.5}
+.irow{display:flex;justify-content:space-between;padding:3px 0;border-bottom:1px solid #21262d;font-size:10px}
+.irow:last-child{border-bottom:none}
+.ik{color:#6e7681}
+.iv{color:#c9d1d9;font-weight:500}
+.iv-f{color:#f87171}
+.iv-c{color:#fbbf24}
+.iv-b{color:#4ade80}
+
+.schema{background:#0d1117;border-radius:5px;padding:8px;border:1px solid #21262d;font-size:9px;font-family:'Courier New',monospace;color:#8b949e;line-height:1.6}
+.schema .kw{color:#79c0ff}
+.schema .st{color:#a5d6ff}
+.schema .cm{color:#3d6b48}
+.schema .val{color:#56d364}
+
+.corr-box{background:rgba(249,115,22,.07);border:1px solid rgba(249,115,22,.25);border-radius:5px;padding:8px;margin-bottom:8px;font-size:9px;line-height:1.7;color:#8b949e}
+.corr-box strong{color:#f97316;display:block;margin-bottom:4px;font-size:9px;text-transform:uppercase;letter-spacing:.08em}
+.corr-item::before{content:'✓ ';color:#4ade80}
+
+.leaflet-tooltip{background:#0d1117!important;border:1px solid #30363d!important;color:#e6edf3!important;font-size:10px!important;border-radius:4px!important;box-shadow:0 2px 8px rgba(0,0,0,.6)!important;padding:4px 8px!important}
+.leaflet-control-zoom a{background:#161b22!important;color:#c9d1d9!important;border-color:#30363d!important}
+</style>
+</head>
+<body>
+<div id="app">
+<div id="entete">
+  <span style="font-size:18px">&#127464;&#127470;</span>
+  <h1>CIV-Eye &mdash; Cadastre Treichville</h1>
+  <span class="etiq v10">V10 FINAL</span>
+  <span class="etiq rfc">RFC 7946</span>
+  <span class="etiq audit">AUDIT &#10003;</span>
+  <span class="etiq geo">TERRAIN &#128506;</span>
+  <span class="etiq corr">8 CORRECTIONS</span>
+  <span style="font-size:9px;color:#484f58;margin-left:auto">19 zones &middot; Topologie planaire parfaite &middot; GeoDjango-ready</span>
+</div>
+<div id="principal">
+<div id="carte"></div>
+<div id="panneau">
+
+  <div class="sgrid">
+    <div class="sc"><div class="sn" style="color:#f87171">7</div><div class="sl">Interdit</div></div>
+    <div class="sc"><div class="sn" style="color:#fbbf24">3</div><div class="sl">Conditionnel</div></div>
+    <div class="sc"><div class="sn" style="color:#4ade80">9</div><div class="sl">Constructible</div></div>
+  </div>
+
+  <div class="sec">Filtres</div>
+  <div class="ftabs">
+    <button class="ftab on f-tout" onclick="filtrerZones('all',this)">Tout</button>
+    <button class="ftab f-interdit" onclick="filtrerZones('forbidden',this)">Interdit</button>
+    <button class="ftab f-conditionnel" onclick="filtrerZones('conditional',this)">Conditionnel</button>
+    <button class="ftab f-constructible" onclick="filtrerZones('buildable',this)">Constructible</button>
+  </div>
+
+  <div class="sec">L&eacute;gende</div>
+  <div class="legrow"><div class="ld" style="background:rgba(239,68,68,.45);border:1.5px solid #ef4444"></div><span class="lt">Interdit &mdash; zone_status='forbidden'</span><span class="ln">7</span></div>
+  <div class="legrow"><div class="ld" style="background:rgba(234,179,8,.45);border:1.5px solid #eab308"></div><span class="lt">Conditionnel &mdash; zone_status='conditional'</span><span class="ln">3</span></div>
+  <div class="legrow"><div class="ld" style="background:rgba(34,197,94,.45);border:1.5px solid #22c55e"></div><span class="lt">Constructible &mdash; zone_status='buildable'</span><span class="ln">9</span></div>
+
+  <div class="sec">Corrections V9&rarr;V10</div>
+  <div class="corr-box">
+    <strong>8 corrections audit&eacute;es</strong>
+    <div class="corr-item">Z06B : r&eacute;f. non officielle supprim&eacute;e</div>
+    <div class="corr-item">Z07 : acronyme CARENA corrig&eacute;</div>
+    <div class="corr-item">Z08 : libell&eacute; neutre (&laquo;&nbsp;Secteur&nbsp;&raquo;)</div>
+    <div class="corr-item">Z09 : type dense_informal&rarr;residential</div>
+    <div class="corr-item">Z10 : type commercial&rarr;mixed + renomm&eacute;e</div>
+    <div class="corr-item">Z11 : op&eacute;rateur RTB supprim&eacute; (dissous)</div>
+    <div class="corr-item">Z01 : desc. enrichie (Quais 1&ndash;6)</div>
+    <div class="corr-item">Z13 : mention March&eacute; Adj&eacute; ajout&eacute;e</div>
+  </div>
+
+  <div class="sec">Mod&egrave;le Django</div>
+  <div class="schema">
+<span class="kw">class</span> <span class="st">ZoneCadastre</span>(models.Model):<br>
+&nbsp;&nbsp;zone_id&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;<span class="kw">=</span> CharField(pk=<span class="val">True</span>, max_length=<span class="val">10</span>)<br>
+&nbsp;&nbsp;name&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;<span class="kw">=</span> CharField(max_length=<span class="val">200</span>)<br>
+&nbsp;&nbsp;zone_type&nbsp;&nbsp;<span class="kw">=</span> CharField(choices=TYPES_ZONE)<br>
+&nbsp;&nbsp;zone_status <span class="kw">=</span> CharField(choices=[<br>
+&nbsp;&nbsp;&nbsp;&nbsp;<span class="val">'forbidden'</span>, <span class="val">'conditional'</span>, <span class="val">'buildable'</span><br>
+&nbsp;&nbsp;])<br>
+&nbsp;&nbsp;description <span class="kw">=</span> TextField()<br>
+&nbsp;&nbsp;geometry&nbsp;&nbsp;&nbsp;<span class="kw">=</span> PolygonField(srid=<span class="val">4326</span>)<br>
+&nbsp;&nbsp;<span class="cm"># surface = ST_Area(geom::geography)</span>
+  </div>
+
+  <div class="sec">Zone s&eacute;lectionn&eacute;e</div>
+  <div id="ib"><div class="hint">&#8593; Cliquez une zone sur la carte<br><span style="font-size:9px">19 zones &middot; Topologie planaire parfaite<br>Port PAA, SITARAIL, CARENA, Gare Lagunes<br>Z05B (CNPS) &middot; Z06B (Kouassi Lenoir)</span></div></div>
+
+</div>
+</div>
+</div>
+<script src="https://cdnjs.cloudflare.com/ajax/libs/leaflet/1.9.4/leaflet.min.js"></script>
+<script>
+const GJ = {"type":"FeatureCollection","crs":{"type":"name","properties":{"name":"urn:ogc:def:crs:OGC:1.3:CRS84"}},"bbox":[-4.03001,5.28501,-3.97301,5.32053],"_metadata":{"version":"v10","commune":"Treichville","ville":"Abidjan","pays":"Côte d'Ivoire","srid":4326,"generated_for":"CIV-Eye – Système de détection des constructions illicites","topology_notes":"V10 : Corrections V9→V10 : Z06B description professionnalisée (référence non officielle supprimée) ; Z07 acronyme CARENA corrigé (Centre Abidjanais de Réparations Navales, non Caisse) ; Z08 libellé 'Tampon'→'Secteur' pour neutralité ; Z09 zone_type dense_informal→residential (France-Amérique = tissu résidentiel structuré établi) ; Z10 zone_type commercial→mixed + renommée Zone Polyfonctionnelle Est + description enrichie ; Z11 opérateur RTB supprimé (entité dissoute), SOTRA maintenu. Z05 scindée (noyau SITARAIL forbidden + frange commerciale est buildable). Z06 scindée (entrepôts PAA forbidden + quartier Kouassi Lenoir conditional). Topologie planaire parfaite — 19 zones.","coord_precision":5,"zones":19,"audit_date":"2026-03-01","stats":{"forbidden":7,"conditional":3,"buildable":9},"corrections_v10":["Z06B: description professionnalisée, référence non officielle supprimée","Z07: acronyme CARENA corrigé — Centre Abidjanais de Réparations Navales","Z08: libellé renommé — 'Secteur Ferroviaire Ouest' plus neutre que 'Tampon'","Z09: zone_type dense_informal→residential (quartier structuré établi)","Z10: zone_type commercial→mixed + renommé Zone Polyfonctionnelle Est (zone polyfonctionnelle)","Z11: opérateur RTB supprimé (entité dissoute), SOTRA maintenu","Z01: description enrichie (Quais 1–6 mentionnés)","Z13: mention Marché Adjé ajoutée"]},"features":[{"type":"Feature","id":"Z01","bbox":[-4.03001,5.28501,-4.00799,5.29301],"properties":{"zone_id":"Z01","name":"Terminal Céréalier & Port Autonome SW","zone_type":"harbour","zone_status":"forbidden","description":"Quais d'accostage sud-ouest du Port Autonome d'Abidjan (PAA) — Quais 1–6. Terminal céréalier, silos de stockage et infrastructures de déchargement vrac. Concessions portuaires actives. Accès strictement réservé aux opérateurs agréés PAA. Domaine public maritime et portuaire. Aucune construction civile, résidentielle ou commerciale non portuaire autorisée."},"geometry":{"type":"Polygon","coordinates":[[[-4.03001,5.28501],[-4.00799,5.28501],[-4.00799,5.29301],[-4.01501,5.29301],[-4.03001,5.29301],[-4.03001,5.28501]]]}},{"type":"Feature","id":"Z02","bbox":[-4.00799,5.28501,-3.97301,5.29301],"properties":{"zone_id":"Z02","name":"Zone Industrielle Portuaire — Port Est","zone_type":"industrial","zone_status":"forbidden","description":"Zone industrialo-portuaire est du PAA. Entrepôts douaniers, magasins sous douane, quais spécialisés (Quais 7–12). Domaine public maritime. Toute construction non portuaire interdite."},"geometry":{"type":"Polygon","coordinates":[[[-4.00799,5.28501],[-3.97301,5.28501],[-3.97301,5.29301],[-3.984,5.29301],[-3.99317,5.29301],[-3.998,5.29301],[-4.00101,5.29301],[-4.00799,5.29301],[-4.00799,5.28501]]]}},{"type":"Feature","id":"Z03","bbox":[-4.03001,5.29301,-4.01501,5.2994],"properties":{"zone_id":"Z03","name":"Zone Commerciale Blvd de Marseille — Secteur Ouest","zone_type":"commercial","zone_status":"buildable","description":"Axe commercial dense en bordure ouest du Boulevard de Marseille. Commerces de gros, ateliers artisanaux, activités de négoce mixtes. Tissu bâti actif sur voiries latérales nord du port. COS 2.0, hauteur max R+4. Permis d'urbanisme municipal obligatoire. Desserte assurée par les voies latérales nord du port."},"geometry":{"type":"Polygon","coordinates":[[[-4.03001,5.29301],[-4.01501,5.29301],[-4.01501,5.29917],[-4.02183,5.2994],[-4.03001,5.29917],[-4.03001,5.29301]]]}},{"type":"Feature","id":"Z04","bbox":[-4.01501,5.29301,-4.00101,5.29917],"properties":{"zone_id":"Z04","name":"Zone Mixte Rue Roger Zinsou — Cœur Commercial","zone_type":"mixed","zone_status":"buildable","description":"Secteur mixte ultra-dynamique autour de la Rue Roger Zinsou. Marchés de quartier, commerce de détail, hébergement locatif, restauration populaire. Tissu urbain dense à structurer. COS 1.8, max R+3. Tout projet de construction soumis à permis municipal. Recul de 5m obligatoire en façade sur voirie."},"geometry":{"type":"Polygon","coordinates":[[[-4.01501,5.29301],[-4.00799,5.29301],[-4.00101,5.29301],[-4.00101,5.2988],[-4.01501,5.29917],[-4.01501,5.29301]]]}},{"type":"Feature","id":"Z05","bbox":[-4.00101,5.29301,-3.998,5.2988],"properties":{"zone_id":"Z05","name":"Gare de Treichville — Emprise SITARAIL (Noyau)","zone_type":"infrastructure","zone_status":"forbidden","description":"Emprise stricte du domaine ferroviaire SITARAIL : bâtiment voyageurs, voies métriques (écartement 1m), quais de chargement fret. Réservé aux opérations de la ligne Abidjan–Ouagadougou. Domaine public de l'État ivoirien. Toute construction ou empiètement non autorisé est illégal."},"geometry":{"type":"Polygon","coordinates":[[[-4.00101,5.29301],[-3.998,5.29301],[-3.998,5.29868],[-4.00101,5.2988],[-4.00101,5.29301]]]}},{"type":"Feature","id":"Z05B","bbox":[-3.998,5.29301,-3.99317,5.2985],"properties":{"zone_id":"Z05B","name":"Frange Est Gare — CNPS Treichville / Commerces Cheminot","zone_type":"commercial","zone_status":"buildable","description":"Secteur commercial et institutionnel immédiatement à l'est de la gare ferroviaire, hors emprise SITARAIL. Comprend le siège CNPS Treichville, la Pharmacie du Cheminot, l'Immeuble T.A. et des commerces actifs sur la rue Cheminot. Tissu bâti structuré. COS 1.8, hauteur max R+3. Permis de construire municipal obligatoire."},"geometry":{"type":"Polygon","coordinates":[[[-3.998,5.29301],[-3.99317,5.29301],[-3.99317,5.2985],[-3.998,5.29868],[-3.998,5.29301]]]}},{"type":"Feature","id":"Z06","bbox":[-3.99317,5.29301,-3.984,5.2985],"properties":{"zone_id":"Z06","name":"Zone Logistique Portuaire Est — Entrepôts PAA","zone_type":"industrial","zone_status":"forbidden","description":"Entrepôts et plateformes logistiques du Port Autonome d'Abidjan (PAA). Rampes de fret, quais spécialisés, magasins sous douane. Accès réservé aux opérateurs portuaires agréés PAA. Domaine public portuaire. Aucune construction civile ou activité non portuaire autorisée."},"geometry":{"type":"Polygon","coordinates":[[[-3.99317,5.29301],[-3.984,5.29301],[-3.984,5.29836],[-3.99317,5.2985],[-3.99317,5.29301]]]}},{"type":"Feature","id":"Z06B","bbox":[-3.984,5.29301,-3.97301,5.2982],"properties":{"zone_id":"Z06B","name":"Quartier Kouassi Lenoir — Zone Mixte Est","zone_type":"dense_informal","zone_status":"conditional","description":"Secteur de transition Treichville–Marcory correspondant au quartier Kouassi Lenoir. Habitat dense sur foncier relevant partiellement du domaine portuaire PAA. Cours communes, petits commerces, ateliers artisanaux. Frange industrielle (GMA, brasserie SOLIBRA) au sud. Régularisation foncière en cours auprès de l'ONAD et du PAA. Toute nouvelle construction nécessite un permis municipal et une étude d'impact vis-à-vis des servitudes portuaires et ferroviaires adjacentes."},"geometry":{"type":"Polygon","coordinates":[[[-3.984,5.29301],[-3.97301,5.29301],[-3.97301,5.2982],[-3.984,5.29836],[-3.984,5.29301]]]}},{"type":"Feature","id":"Z07","bbox":[-4.03001,5.29917,-4.02183,5.30601],"properties":{"zone_id":"Z07","name":"CARENA — Chantier Naval de Treichville","zone_type":"industrial","zone_status":"forbidden","description":"Emprise du Centre Abidjanais de Réparations Navales (CARENA). Cale sèche, ateliers de mécanique navale, plans inclinés et appontements sur la Lagune Ébrié. Zone industrielle lourde en bordure lagunaire. Domaine public maritime. Toute construction résidentielle, commerciale ou non liée à l'industrie navale est strictement interdite."},"geometry":{"type":"Polygon","coordinates":[[[-4.03001,5.29917],[-4.02183,5.2994],[-4.02183,5.3058],[-4.03001,5.30601],[-4.03001,5.29917]]]}},{"type":"Feature","id":"Z08","bbox":[-4.02183,5.29917,-4.01501,5.3064],"properties":{"zone_id":"Z08","name":"Quartier Résidentiel Kennedy — Secteur Ferroviaire Ouest","zone_type":"residential","zone_status":"conditional","description":"Quartier résidentiel établi de Kennedy, situé en frange de la bande ferroviaire SITARAIL et du chantier naval CARENA. Tissu bâti structuré avec habitat de standing moyen. Toute nouvelle construction nécessite une étude d'impact vibratoire et acoustique préalable (proximité voie ferrée active). COS 1.0, hauteur max R+2. Réseaux VRD partiellement existants à compléter."},"geometry":{"type":"Polygon","coordinates":[[[-4.02183,5.2994],[-4.01501,5.29917],[-4.01501,5.3064],[-4.02183,5.3058],[-4.02183,5.2994]]]}},{"type":"Feature","id":"Z09","bbox":[-4.01501,5.2988,-4.00101,5.3064],"properties":{"zone_id":"Z09","name":"Quartier France-Amérique","zone_type":"residential","zone_status":"conditional","description":"Quartier résidentiel structuré de France-Amérique. Tissu bâti établi de type habitat de cours, issu du plan colonial de Treichville. Logements locatifs denses, commerces de proximité en rez-de-chaussée. Parcellaire à régulariser auprès des services du Domaine. Réseaux d'eau et d'assainissement à consolider sur certaines voies. Permis de construire municipal exigé pour tout projet supérieur à R+1. Contrainte acoustique SITARAIL sur la frange sud."},"geometry":{"type":"Polygon","coordinates":[[[-4.01501,5.29917],[-4.00101,5.2988],[-4.00101,5.3057],[-4.01501,5.3064],[-4.01501,5.29917]]]}},{"type":"Feature","id":"Z10","bbox":[-4.00101,5.2982,-3.97301,5.3057],"properties":{"zone_id":"Z10","name":"Zone Polyfonctionnelle Est — Nangui Abrogoua / Adjouffou","zone_type":"mixed","zone_status":"buildable","description":"Grande zone polyfonctionnelle couvrant la moitié est de Treichville. Associe un corridor commercial dense longeant l'Avenue Nangui Abrogoua (négoce, marchés de rue, Marché Gouro), des secteurs résidentiels établis (quartiers Adjouffou et New Town) et des ateliers artisanaux. COS 1.8 sur front commercial, COS 1.2 en retrait résidentiel. Hauteur max R+3. Servitude de voirie de 10m de part et d'autre de l'axe Nangui Abrogoua. Tout projet de construction soumis à permis municipal."},"geometry":{"type":"Polygon","coordinates":[[[-4.00101,5.2988],[-3.998,5.29868],[-3.99317,5.2985],[-3.984,5.29836],[-3.97301,5.2982],[-3.97301,5.3051],[-3.99317,5.3054],[-4.00101,5.3057],[-4.00101,5.2988]]]}},{"type":"Feature","id":"Z11","bbox":[-4.03001,5.3058,-4.01501,5.31601],"properties":{"zone_id":"Z11","name":"Gare des Lagunes & Quai N'Dotré","zone_type":"harbour","zone_status":"forbidden","description":"Terminal lagunaire SOTRA (Gare des Lagunes) et quai N'Dotré. Embarcadères des bacs reliant Treichville au Plateau, à Yopougon et à Adjamé. Infrastructures de transport lagunaire actives. Domaine public fluvio-lagunaire de l'État ivoirien. Aucune construction civile ou industrielle non liée aux transports lagunaires n'est autorisée."},"geometry":{"type":"Polygon","coordinates":[[[-4.03001,5.30601],[-4.02183,5.3058],[-4.01501,5.3064],[-4.01501,5.31101],[-4.01501,5.31601],[-4.03001,5.31601],[-4.03001,5.30601]]]}},{"type":"Feature","id":"Z12","bbox":[-4.01501,5.3057,-4.00101,5.31101],"properties":{"zone_id":"Z12","name":"Quartier Belle-Ville — Résidentiel Ouest","zone_type":"residential","zone_status":"buildable","description":"Quartier résidentiel structuré de Belle-Ville, issu du plan d'urbanisme colonial. Tissu orthogonal régulier, voirie bitumée, réseaux VRD complets. Vocation résidentielle dominante avec quelques équipements de quartier. COS 1.2, hauteur max R+2. Activités commerciales en rez-de-chaussée admises sur les axes principaux. Recul de 3m en façade obligatoire."},"geometry":{"type":"Polygon","coordinates":[[[-4.01501,5.3064],[-4.00101,5.3057],[-4.00101,5.3108],[-4.01501,5.31101],[-4.01501,5.3064]]]}},{"type":"Feature","id":"Z13","bbox":[-4.00101,5.3054,-3.99317,5.3108],"properties":{"zone_id":"Z13","name":"Grand Marché de Treichville & Abords","zone_type":"commercial","zone_status":"buildable","description":"Périmètre du Grand Marché de Treichville (Marché Adjé) et son aire d'influence commerciale immédiate. Pôle marchand majeur d'Abidjan : commerce de détail et de gros, alimentation, textile, électronique. COS 2.5, hauteur max R+4. Constructions mixtes commerce/logement autorisées. Recul de façade nul admis sur les arcades marchandes. Permis de construire obligatoire."},"geometry":{"type":"Polygon","coordinates":[[[-4.00101,5.3057],[-3.99317,5.3054],[-3.99317,5.3106],[-4.00101,5.3108],[-4.00101,5.3057]]]}},{"type":"Feature","id":"Z14","bbox":[-3.99317,5.3051,-3.97301,5.3106],"properties":{"zone_id":"Z14","name":"Quartier Arras — Boulevard Général de Gaulle","zone_type":"residential","zone_status":"buildable","description":"Quartier Arras, longeant le Boulevard Général de Gaulle en direction de la commune de Marcory. Habitat résidentiel dense de standing moyen, équipements publics (école primaire, dispensaire de quartier). Tissu bâti structuré avec parcellaire régulier. COS 1.5, max R+3. Façade sur boulevard soumise à alignement obligatoire (servitude de voirie de 8m). Permis de construire municipal requis."},"geometry":{"type":"Polygon","coordinates":[[[-3.99317,5.3054],[-3.97301,5.3051],[-3.97301,5.3105],[-3.99317,5.3106],[-3.99317,5.3054]]]}},{"type":"Feature","id":"Z15","bbox":[-4.01501,5.3108,-4.00101,5.31601],"properties":{"zone_id":"Z15","name":"Quartier Nanan Yamousso — Résidentiel Central-Nord","zone_type":"residential","zone_status":"buildable","description":"Quartier Nanan Yamousso, secteur résidentiel central-nord de Treichville. Tissu urbain structuré en voisinage de la berge lagunaire nord. Habitat R+1 à R+3 dominant. COS 1.5, hauteur max R+3. Servitude de recul non aedificandi de 15m par rapport à la laisse des hautes eaux de la Lagune Ébrié (limite nord = Z17). Permis de construire municipal obligatoire."},"geometry":{"type":"Polygon","coordinates":[[[-4.01501,5.31101],[-4.00101,5.3108],[-4.00101,5.31601],[-4.01501,5.31601],[-4.01501,5.31101]]]}},{"type":"Feature","id":"Z16","bbox":[-4.00101,5.3105,-3.97301,5.31601],"properties":{"zone_id":"Z16","name":"Quartier Biafra & Résidentiel Nord-Est","zone_type":"residential","zone_status":"buildable","description":"Secteur résidentiel nord-est englobant le quartier Biafra et ses abords. Tissu bâti dense à caractère populaire, vocation résidentielle mixte. COS 1.2, hauteur max R+2. Proximité immédiate de la berge lagunaire (Z17 au nord) : toute construction en recul insuffisant fait l'objet d'une étude de risque inondation et d'érosion de berge obligatoire. Permis de construire municipal requis."},"geometry":{"type":"Polygon","coordinates":[[[-4.00101,5.3108],[-3.99317,5.3106],[-3.97301,5.3105],[-3.97301,5.31601],[-4.00101,5.31601],[-4.00101,5.3108]]]}},{"type":"Feature","id":"Z17","bbox":[-4.03001,5.31601,-3.97301,5.32053],"properties":{"zone_id":"Z17","name":"Berge Lagune Ébrié — Zone Inondable Nord","zone_type":"flood_prone","zone_status":"forbidden","description":"Bande littorale nord de Treichville exposée directement sur la Lagune Ébrié. Zone à haut risque d'inondation, d'érosion et d'effondrement de berge (classée ONAD/BNETD). Servitude de non aedificandi absolue sur 50m depuis la laisse des hautes eaux. Toute construction est strictement interdite. Périmètre de protection des écosystèmes lagunaires."},"geometry":{"type":"Polygon","coordinates":[[[-4.03001,5.31601],[-4.01501,5.31601],[-4.00101,5.31601],[-3.97301,5.31601],[-3.97301,5.32001],[-3.98199,5.31953],[-3.98701,5.31877],[-3.99317,5.32001],[-3.99801,5.32053],[-4.00101,5.31933],[-4.00601,5.31823],[-4.00901,5.32001],[-4.01203,5.32001],[-4.01501,5.32001],[-4.01699,5.31877],[-4.01901,5.32053],[-4.02183,5.32001],[-4.02399,5.31953],[-4.02701,5.31823],[-4.03001,5.32001],[-4.03001,5.31601]]]}}]};
+
+const LABEL_STATUT = {
+  forbidden   : 'Interdit',
+  conditional : 'Conditionnel',
+  buildable   : 'Constructible'
+};
+const LABEL_TYPE = {
+  harbour       : 'Portuaire',
+  industrial    : 'Industriel',
+  infrastructure: 'Infrastructure ferroviaire',
+  commercial    : 'Commercial',
+  mixed         : 'Mixte',
+  residential   : 'Résidentiel',
+  dense_informal: 'Habitat dense informel',
+  buffer        : 'Zone tampon',
+  flood_prone   : 'Zone inondable'
+};
+const CLASSE_BADGE = {
+  forbidden   : 'ib-interdit',
+  conditional : 'ib-conditionnel',
+  buildable   : 'ib-constructible'
+};
+const CM = {
+  forbidden  : {fill:'#ef4444', stroke:'#ff6666'},
+  conditional: {fill:'#eab308', stroke:'#fde047'},
+  buildable  : {fill:'#22c55e', stroke:'#86efac'}
+};
+
+const carte = L.map('carte').setView([5.305,-4.003],14);
+L.tileLayer('https://{s}.tile.openstreetmap.org/{z}/{x}/{y}.png',{
+  attribution:'&copy; Contributeurs OpenStreetMap', maxZoom:20
+}).addTo(carte);
+
+const PANNEAUX = {forbidden:'p-f', conditional:'p-c', buildable:'p-b'};
+const ZIDX     = {forbidden:400,   conditional:450,   buildable:500};
+Object.entries(PANNEAUX).forEach(function([s,p]){
+  carte.createPane(p);
+  carte.getPane(p).style.zIndex = ZIDX[s];
+  carte.getPane(p).style.pointerEvents = 'auto';
+});
+
+function styleZone(f){
+  var s=f.properties.zone_status, cm=CM[s]||{fill:'#888',stroke:'#aaa'};
+  return{pane:PANNEAUX[s],fillColor:cm.fill,fillOpacity:.45,color:cm.stroke,weight:1.5};
+}
+
+function afficherInfo(p){
+  var s=p.zone_status, cls=CLASSE_BADGE[s]||'';
+  var iv=s==='forbidden'?'iv-f':s==='conditional'?'iv-c':'iv-b';
+  var h='<span class="ibadge '+cls+'">'+(LABEL_STATUT[s]||s)+'</span>';
+  h+='<div class="iname">'+p.name+'</div>';
+  h+='<div class="idesc">'+p.description+'</div>';
+  h+='<div class="irow"><span class="ik">Identifiant</span><span class="iv">'+p.zone_id+'</span></div>';
+  h+='<div class="irow"><span class="ik">Type de zone</span><span class="iv">'+(LABEL_TYPE[p.zone_type]||p.zone_type)+'</span></div>';
+  h+='<div class="irow"><span class="ik">Statut</span><span class="iv '+iv+'">'+(LABEL_STATUT[s]||s)+'</span></div>';
+  h+='<div class="irow"><span class="ik">Surface</span><span class="iv" style="color:#484f58;font-style:italic">ST_Area(geom::geography)</span></div>';
+  document.getElementById('ib').innerHTML=h;
+}
+
+var groupes={};
+['forbidden','conditional','buildable'].forEach(function(s){
+  var feats=GJ.features.filter(function(f){return f.properties.zone_status===s;});
+  var lg=L.geoJSON({type:'FeatureCollection',features:feats},{
+    style:styleZone,
+    pane:PANNEAUX[s],
+    onEachFeature:function(f,layer){
+      var p=f.properties;
+      layer.on({
+        click:function(e){
+          Object.values(groupes).forEach(function(g){g.resetStyle();});
+          layer.setStyle({fillColor:CM[p.zone_status].fill,fillOpacity:.92,color:'#fff',weight:2.5});
+          afficherInfo(p);
+          L.DomEvent.stopPropagation(e);
+        },
+        mouseover:function(e){e.target.setStyle({fillOpacity:.78,weight:2});},
+        mouseout :function(e){groupes[p.zone_status].resetStyle(e.target);}
+      });
+      layer.bindTooltip(
+        '<b>'+p.name+'</b><br><span style="opacity:.7">'+(LABEL_STATUT[p.zone_status]||p.zone_status)+' · '+(LABEL_TYPE[p.zone_type]||p.zone_type)+'</span>',
+        {direction:'top',sticky:true}
+      );
+    }
+  });
+  groupes[s]=lg; lg.addTo(carte);
+});
+
+function filtrerZones(statut,btn){
+  document.querySelectorAll('.ftab').forEach(function(b){
+    b.classList.remove('on','f-tout','f-interdit','f-conditionnel','f-constructible');
+  });
+  if(btn){
+    btn.classList.add('on');
+    var map={'all':'f-tout','forbidden':'f-interdit','conditional':'f-conditionnel','buildable':'f-constructible'};
+    btn.classList.add(map[statut]||'f-tout');
+  }
+  ['forbidden','conditional','buildable'].forEach(function(s){
+    var v=(statut==='all'||s===statut);
+    if(v && !carte.hasLayer(groupes[s])) carte.addLayer(groupes[s]);
+    if(!v && carte.hasLayer(groupes[s])) carte.removeLayer(groupes[s]);
+  });
+}
+
+carte.on('click',function(){
+  Object.values(groupes).forEach(function(g){g.resetStyle();});
+  document.getElementById('ib').innerHTML='<div class="hint">&#8593; Cliquez une zone sur la carte</div>';
+});
+
+var toutesZones=L.featureGroup(Object.values(groupes));
+carte.fitBounds(toutesZones.getBounds(),{padding:[10,10]});
+</script>
+</body>
+</html>
