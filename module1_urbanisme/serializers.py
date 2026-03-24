@@ -106,7 +106,7 @@ class DetectionConstructionSerializer(serializers.ModelSerializer):
             'conforme': '🟢 Développement Conforme',
             'surveillance_preventive': '🔵 Surveillance Préventive',
         }
-        return labels.get(obj.status, obj.status_display)
+        return labels.get(obj.status, obj.get_status_display())
     
     def get_traitee_par_username(self, obj):
         """Retourne le username de l'agent qui a traité la détection"""
@@ -121,9 +121,10 @@ class DetectionCreateSerializer(serializers.ModelSerializer):
     class Meta:
         model = DetectionConstruction
         fields = [
-            'zone_cadastrale', 'geometry_geojson', 'ndbi_t1', 'ndbi_t2',
+            'zone_cadastrale', 'geometry', 'geometry_geojson', 'ndbi_t1', 'ndbi_t2',
             'bsi_value', 'surface_m2', 'confidence'
         ]
+        read_only_fields = ['geometry_geojson']
 
 
 class DetectionUpdateSerializer(serializers.ModelSerializer):

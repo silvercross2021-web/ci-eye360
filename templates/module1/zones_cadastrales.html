@@ -3,52 +3,76 @@
 {% block title %}Zones Cadastrales - CIV-Eye Module 1{% endblock %}
 
 {% block content %}
-<div class="row mb-4">
-    <div class="col-12">
-        <h1 class="h3 mb-3"><i class="fas fa-map"></i> Zones Cadastrales</h1>
+<div class="row mb-4 align-items-center">
+    <div class="col-md-8">
+        <h1 class="h3 mb-2" style="color: var(--neon-blue); text-shadow: 0 0 10px rgba(13,202,240,0.3);">
+            <i class="fas fa-map-marked-alt"></i> REGISTRE CADASTRAL
+        </h1>
+        <p style="color: rgba(255,255,255,0.7); font-size: 14px; margin: 0;">
+            Base de données spatiale — Cartographie et statut d'urbanisme des parcelles surveillées.
+        </p>
+    </div>
+    <div class="col-md-4 text-end">
+        <div style="background: var(--glass-panel); border: 1px solid var(--glass-border); padding: 10px; border-radius: 8px; display: inline-block;">
+            <span style="color: rgba(255,255,255,0.5); font-size: 11px;">SYNCHRONISATION:</span> <span style="color: var(--neon-blue);"><i class="fas fa-satellite-dish"></i> ACTIVE</span>
+        </div>
     </div>
 </div>
 
 <div class="row">
     <div class="col-12">
-        <div class="card">
-            <div class="card-body">
-                <table class="table table-hover mb-0">
-                    <thead class="table-light">
-                        <tr>
-                            <th>Département</th>
-                            <th>Section</th>
-                            <th>Parcelle</th>
-                            <th>Statut Constructibilité</th>
-                            <th>Surface estimée (m²)</th>
-                            <th>Nombre de détections</th>
-                            <th>Actions</th>
+        <div class="card" style="background: var(--glass-panel); border: 1px solid var(--glass-border);">
+            <div class="card-body p-0">
+                <div class="table-responsive">
+                    <table class="table table-hover mb-0 align-middle" style="background: transparent;">
+                        <thead style="background: rgba(0,0,0,0.5);">
+                        <tr style="text-transform: uppercase; font-size: 11px; letter-spacing: 1px; color: rgba(255,255,255,0.6);" class="border-0">
+                            <th class="py-3 px-4 border-0">ID Parcelle</th>
+                            <th class="py-3 px-4 border-0">Désignation</th>
+                            <th class="py-3 px-4 border-0">Type de Zone</th>
+                            <th class="py-3 px-4 border-0">Statut Constructibilité</th>
+                            <th class="py-3 px-4 border-0 text-center">Activité IA</th>
+                            <th class="py-3 px-4 border-0 text-end">Analyse</th>
                         </tr>
                     </thead>
                     <tbody>
                         {% for zone in zones %}
-                        <tr>
-                            <td>{{ zone.department }}</td>
-                            <td>{{ zone.section }}</td>
-                            <td>{{ zone.parcel_id }}</td>
-                            <td>
+                        <tr style="transition: all 0.2s; border-bottom: 1px solid rgba(255,255,255,0.05);" onmouseover="this.style.background='rgba(255,255,255,0.05)'" onmouseout="this.style.background='transparent'">
+                            <td class="px-4">
+                                <strong style="color: var(--neon-blue);"><i class="fas fa-vector-square me-1"></i> {{ zone.zone_id }}</strong>
+                            </td>
+                            <td class="px-4 text-white">{{ zone.name|truncatechars:40 }}</td>
+                            <td class="px-4"><span class="badge border border-info text-info bg-transparent px-2 py-1">{{ zone.zone_type|upper }}</span></td>
+                            <td class="px-4">
                                 <span
-                                    class="badge {% if zone.buildable_status == 'buildable' %}bg-success{% elif zone.buildable_status == 'conditional' %}bg-warning{% else %}bg-danger{% endif %}">
-                                    {{ zone.get_buildable_status_display }}
+                                    class="badge {% if zone.buildable_status == 'buildable' %}bg-success text-dark{% elif zone.buildable_status == 'conditional' %}bg-warning text-dark{% else %}bg-danger text-white{% endif %} px-2 py-1 shadow-sm">
+                                    {{ zone.get_buildable_status_display|upper }}
                                 </span>
                             </td>
-                            <td>{% if zone.surface_m2 %}{{ zone.surface_m2|floatformat:0 }} m²{% else %}-{% endif %}
+                            <td class="px-4 text-center">
+                                {% if zone.detection_count > 0 %}
+                                <span style="font-family: var(--font-main); font-weight: bold; color: var(--neon-red); font-size: 1.1em;">
+                                    <i class="fas fa-fire me-1"></i> {{ zone.detection_count }}
+                                </span>
+                                {% else %}
+                                <span style="color: rgba(255,255,255,0.3);"><i class="fas fa-minus"></i></span>
+                                {% endif %}
                             </td>
-                            <td>{{ zone.detection_count }}</td>
-                            <td>
-                                <a href="{% url 'zone_detail' zone.zone_id %}" class="btn btn-sm btn-outline-primary">
-                                    <i class="fas fa-eye"></i> Voir
+                            <td class="px-4 text-end">
+                                <a href="{% url 'zone_detail' zone.zone_id %}" class="btn btn-outline-info btn-sm py-1 px-3" style="border-radius: 20px;">
+                                    <i class="fas fa-search-location me-1"></i> EXAMINER
                                 </a>
                             </td>
                         </tr>
                         {% empty %}
                         <tr>
-                            <td colspan="7" class="text-center text-muted py-4">Aucune zone cadastrale trouvée.</td>
+                            <td colspan="6" class="text-center py-5">
+                                <div style="font-size: 50px; color: rgba(255,255,255,0.1); margin-bottom: 20px;">
+                                    <i class="fas fa-map"></i>
+                                </div>
+                                <h5 style="color: var(--neon-blue); text-transform: uppercase;">Aucune Zone Enregistrée</h5>
+                                <p style="color: rgba(255,255,255,0.6);">La base de données cadastrale est actuellement vide.</p>
+                            </td>
                         </tr>
                         {% endfor %}
                     </tbody>

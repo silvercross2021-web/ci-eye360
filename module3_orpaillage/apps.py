@@ -2,5 +2,5 @@ from django.apps import AppConfig
 
 
 class Module3OrpaillageConfig(AppConfig):
-    default_auto_field = "django.db.models.BigAutoField"
+    default_auto_field = "django.db.models.BigAutoField"  # type: ignore
     name = "module3_orpaillage"

@@ -10,7 +10,8 @@ import json
 import os
 
 from django.core.management.base import BaseCommand
-from django.db.models import Count   # ← CORRECTIF A9 (was: models.Count → NameError)
+from django.db.models import Count
+from django.contrib.gis.geos import GEOSGeometry  # ← NOUVEAU POUR POSTGIS
 
 from module1_urbanisme.models import ZoneCadastrale
 
@@ -125,7 +126,7 @@ class Command(BaseCommand):
             "name": properties.get("name", "Zone inconnue"),
             "zone_type": properties.get("zone_type", "residential"),
             "buildable_status": buildable_status,
-            "geometry_geojson": json.dumps(geometry),
+            "geometry": GEOSGeometry(json.dumps(geometry)),
             "metadata": {
                 "description": properties.get("description", ""),
                 "bbox": feature.get("bbox"),
@@ -139,7 +140,7 @@ class Command(BaseCommand):
         zone.name = zone_data["name"]
         zone.zone_type = zone_data["zone_type"]
         zone.buildable_status = zone_data["buildable_status"]
-        zone.geometry_geojson = zone_data["geometry_geojson"]
+        zone.geometry = zone_data["geometry"]
         zone.metadata = zone_data["metadata"]
         zone.save()
 

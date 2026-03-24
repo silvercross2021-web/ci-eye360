@@ -1,4 +1,6 @@
 <!DOCTYPE html>
+{% load static %}
+{% load django_browser_reload %}
 <html lang="fr">
 
 <head>
@@ -19,7 +21,9 @@
             --neon-green: #00FF88;
             --neon-red: #FF4444;
             --neon-orange: #fd7e14;
-            --glass-bg: rgba(10, 10, 10, 0.7);
+            --neon-blue: #0dcaf0;
+            --neon-cyan: #0dcaf0;
+            --glass-bg: rgba(10, 10, 10, 0.75);
             --border-color: rgba(0, 255, 136, 0.3);
             --font-main: 'JetBrains Mono', monospace;
         }
@@ -178,6 +182,31 @@
             display: flex;
             flex-direction: column;
             gap: 10px;
+            z-index: 1000;
+        }
+
+        .filter-group {
+            display: flex;
+            flex-direction: column;
+            gap: 10px;
+            position: relative;
+        }
+
+        .filter-options {
+            display: flex;
+            flex-direction: column;
+            gap: 10px;
+            max-height: 0;
+            overflow: hidden;
+            transition: max-height 0.4s ease, opacity 0.4s ease;
+            opacity: 0;
+            margin-top: -10px;
+        }
+
+        .filter-group:hover .filter-options {
+            max-height: 300px;
+            opacity: 1;
+            margin-top: 0;
         }
 
         /* RIGHT SIDEBAR (Nav) */
@@ -238,6 +267,42 @@
             background: rgba(253, 126, 20, 0.1);
             border-color: var(--neon-orange);
             box-shadow: 0 0 15px rgba(253, 126, 20, 0.4);
+            color: white;
+        }
+
+        .cyber-btn.btn-green {
+            color: var(--neon-green);
+            border-color: rgba(0, 255, 136, 0.3);
+        }
+        .cyber-btn.btn-green:hover,
+        .cyber-btn.btn-green.active {
+            background: rgba(0, 255, 136, 0.1);
+            border-color: var(--neon-green);
+            box-shadow: 0 0 15px rgba(0, 255, 136, 0.4);
+            color: white;
+        }
+
+        .cyber-btn.btn-cyan {
+            color: var(--neon-cyan);
+            border-color: rgba(13, 202, 240, 0.3);
+        }
+        .cyber-btn.btn-cyan:hover,
+        .cyber-btn.btn-cyan.active {
+            background: rgba(13, 202, 240, 0.1);
+            border-color: var(--neon-cyan);
+            box-shadow: 0 0 15px rgba(13, 202, 240, 0.4);
+            color: white;
+        }
+
+        .cyber-btn.btn-blue {
+            color: #4488ff;
+            border-color: rgba(68, 136, 255, 0.3);
+        }
+        .cyber-btn.btn-blue:hover,
+        .cyber-btn.btn-blue.active {
+            background: rgba(68, 136, 255, 0.1);
+            border-color: #4488ff;
+            box-shadow: 0 0 15px rgba(68, 136, 255, 0.4);
             color: white;
         }
 
@@ -437,32 +502,62 @@
         </div>
 
         <!-- STATS PANEL LEFT -->
-        <div class="stats-panel interactive">
-            <div
-                style="color:var(--neon-green); margin-bottom:10px; border-bottom:1px solid var(--border-color); padding-bottom:5px;">
-                > SYSTEM_STATUS
+        <div class="stats-panel interactive" style="width: 260px;">
+            <div style="color:var(--neon-green); margin-bottom:12px; border-bottom:1px solid var(--border-color); padding-bottom:8px; font-weight: bold; font-size: 14px; text-transform: uppercase;">
+                <i class="fas fa-chart-pie"></i> SYNTHÈSE DES DÉTECTIONS
             </div>
-            <div class="stat-line"><span>INFRACTIONS</span> <span class="stat-val" style="color:var(--neon-red)">{{
-                    detections_stats.detections_infraction }}</span></div>
-            <div class="stat-line"><span>INSPECTIONS</span> <span class="stat-val" style="color:var(--neon-orange)">{{
-                    detections_stats.detections_sous_condition }}</span></div>
-            <div class="stat-line"><span>CONFORMES</span> <span class="stat-val" style="color:var(--neon-green)">{{
-                    detections_stats.detections_conforme }}</span></div>
+            <div class="stat-line">
+                <span><i class="fas fa-exclamation-triangle" style="color:var(--neon-red); width: 16px;"></i> INFRACTIONS</span> 
+                <span class="stat-val" style="color:var(--neon-red)">{{ detections_stats.detections_infraction|default:"0" }}</span>
+            </div>
+            <div class="stat-line">
+                <span><i class="fas fa-eye" style="color:var(--neon-orange); width: 16px;"></i> INSPECTIONS</span> 
+                <span class="stat-val" style="color:var(--neon-orange)">{{ detections_stats.detections_sous_condition|default:"0" }}</span>
+            </div>
+            <div class="stat-line">
+                <span><i class="fas fa-check-circle" style="color:var(--neon-green); width: 16px;"></i> CONFORMES</span> 
+                <span class="stat-val" style="color:var(--neon-green)">{{ detections_stats.detections_conforme|default:"0" }}</span>
+            </div>
+            <div class="stat-line">
+                <span><i class="fas fa-shield-alt" style="color:var(--neon-blue); width: 16px;"></i> VEILLES</span> 
+                <span class="stat-val" style="color:var(--neon-blue)">{{ detections_stats.detections_preventive|default:"0" }}</span>
+            </div>
+            <div style="margin-top:12px; padding-top:8px; border-top:1px solid var(--border-color); font-size:11px; color:rgba(255,255,255,0.7); line-height: 1.5;">
+                <i class="fas fa-satellite"></i> Résolution: <b style="color:var(--neon-green)">10m/px</b><br>
+                <i class="fas fa-draw-polygon"></i> Filtre surface: <b style="color:var(--neon-green)">&ge; 200m&sup2;</b>
+            </div>
         </div>
 
         <!-- LEFT SIDEBAR (MAP CONTROLS) -->
         <div class="sidebar-left interactive">
-            <div class="cyber-btn active" onclick="showAllDetections(); setActive(this)"
-                data-tooltip="TOUTES LES ALERTES">
-                <i class="fas fa-layer-group"></i>
+            <div class="filter-group">
+                <div class="cyber-btn active" onclick="showAllDetections(); setActive(this)"
+                    data-tooltip="FILTRES (SURVOLEZ POUR AFFICHER)">
+                    <i class="fas fa-layer-group"></i>
+                </div>
+                <div class="filter-options">
+                    <div class="cyber-btn btn-red" onclick="showRedAlerts(); setActive(this)"
+                        data-tooltip="FILTRE: INFRACTION (ROUGE)">
+                        <i class="fas fa-exclamation-triangle"></i>
+                    </div>
+                    <div class="cyber-btn btn-orange" onclick="showOrangeAlerts(); setActive(this)"
+                        data-tooltip="FILTRE: INSPECTION (ORANGE)">
+                        <i class="fas fa-eye"></i>
+                    </div>
+                    <div class="cyber-btn btn-green" onclick="showGreenAlerts(); setActive(this)"
+                        data-tooltip="FILTRE: CONFORME (VERT)">
+                        <i class="fas fa-check-circle"></i>
+                    </div>
+                    <div class="cyber-btn btn-cyan" onclick="showCyanAlerts(); setActive(this)"
+                        data-tooltip="FILTRE: VEILLE (BLEU)">
+                        <i class="fas fa-shield-alt"></i>
+                    </div>
+                </div>
             </div>
-            <div class="cyber-btn btn-red" onclick="showRedAlerts(); setActive(this)"
-                data-tooltip="FILTRE: ROUGE (INFRACTION)">
-                <i class="fas fa-exclamation-triangle"></i>
-            </div>
-            <div class="cyber-btn btn-orange" onclick="showOrangeAlerts(); setActive(this)"
-                data-tooltip="FILTRE: ORANGE (INSPECTION)">
-                <i class="fas fa-eye"></i>
+            <div style="height: 10px;"></div>
+            <div class="cyber-btn btn-blue active" id="btn-cadastre" onclick="toggleCadastre()"
+                data-tooltip="AFFICHER/MASQUER CADASTRE">
+                <i class="fas fa-map"></i>
             </div>
         </div>
 
@@ -511,15 +606,40 @@
         let zonesLayer;
 
         function initMap() {
+            // Limites géographiques de la Côte d'Ivoire (Sud-Ouest, Nord-Est)
+            const ciBounds = L.latLngBounds([
+                [4.0, -9.0],
+                [11.0, -2.5]
+            ]);
+
             // Vue initiale centrée sur Treichville
             map = L.map('map', {
-                zoomControl: false // Disable default zoom to match UI
+                zoomControl: false, // Disable default zoom to match UI
+                maxBounds: ciBounds,
+                maxBoundsViscosity: 1.0, // Effet "mur solide" sur les bords du pays
+                minZoom: 6 // Autoriser un dézoom un poil plus large pour voir la CI complète
             }).setView([5.30, -4.00], 14);
 
-            // Google Maps Satellite Layout
-            L.tileLayer('https://mt1.google.com/vt/lyrs=s&x={x}&y={y}&z={z}', {
+            // Google Maps Hybrid Layout (Satellite HD + Rues + Noms de Villes)
+            L.tileLayer('https://mt1.google.com/vt/lyrs=y&x={x}&y={y}&z={z}', {
                 attribution: 'Tiles &copy; Google',
-                maxZoom: 20
+                maxZoom: 21
+            }).addTo(map);
+
+            // MASQUE OCCULTANT (Cache les autres pays)
+            // Contour mondial
+            const worldEdges = [
+                [90, 180], [90, -180], [-90, -180], [-90, 180]
+            ];
+            // Découpage parfait de la Côte d'Ivoire (le 'trou' du masque d'après le GeoJSON officiel)
+            const ciHole = [[4.994476, -2.856125], [4.984296, -3.311084], [5.179813, -4.00882], [5.168264, -4.649917], [4.993701, -5.834496], [4.705088, -6.528769], [4.338288, -7.518941], [4.364566, -7.712159], [5.188159, -7.635368], [5.313345, -7.539715], [5.707352, -7.570153], [6.12619, -7.993693], [6.193033, -8.311348], [6.467564, -8.60288], [6.911801, -8.385452], [7.395208, -8.485446], [7.686043, -8.439298], [7.68718, -8.280703], [8.123329, -8.221792], [8.316444, -8.299049], [8.455453, -8.203499], [8.575704, -7.8321], [9.376224, -8.079114], [9.789532, -8.309616], [10.12902, -8.229337], [10.206535, -8.029944], [10.297382, -7.89959], [10.147236, -7.622759], [10.138994, -6.850507], [10.430811, -6.666461], [10.411303, -6.493965], [10.524061, -6.205223], [10.096361, -6.050452], [10.222555, -5.816926], [10.370737, -5.404342], [10.152714, -4.954653], [9.821985, -4.779884], [9.610835, -4.330247], [9.862344, -3.980449], [9.900326, -3.511899], [9.642461, -2.827496], [8.219628, -2.56219], [7.379705, -2.983585], [6.250472, -3.24437], [5.389051, -2.810701], [4.994476, -2.856125]];
+
+            L.polygon([worldEdges, ciHole], {
+                color: '#00FF88',  // Bordure couleur néon pour le style Cyber-Tactical
+                fillColor: '#000',
+                fillOpacity: 1.0,  // Noir total absolu sur les pays limitrophes
+                weight: 1.5,
+                dashArray: '5, 10'
             }).addTo(map);
 
             loadZonesCadastrales();
@@ -555,41 +675,104 @@
                         'veille': '#0dcaf0'
                     };
 
-                    detectionsLayer = L.geoJSON(data, {
-                        style: function (feature) {
-                            const color = alertColors[feature.properties.alert_level] || '#888888';
-                            return {
-                                fillColor: color,
-                                color: color,
-                                weight: 2,
-                                opacity: 1,
-                                fillOpacity: 0.4
-                            };
-                        },
-                        onEachFeature: function (feature, layer) {
-                            const p = feature.properties;
-                            const lat = p.latitude != null ? p.latitude.toFixed(6) : 'N/A';
-                            const lon = p.longitude != null ? p.longitude.toFixed(6) : 'N/A';
+                    detectionsLayer = L.layerGroup();
 
-                            const gmapLink = (p.latitude && p.longitude) ?
-                                `<a href="https://www.google.com/maps/search/?api=1&query=${lat},${lon}" target="_blank" class="cyber-link mb-2" style="display:block; text-align:center;"><i class="fas fa-satellite"></i> GOOGLE MAPS</a>` : '';
+                    data.features.forEach(function (feature) {
+                        const p = feature.properties;
+                        const color = alertColors[p.alert_level] || '#888888';
 
-                            layer.bindPopup(`
-                                <div style="font-size:11px; padding:5px;">
-                                    <strong style="color:var(--neon-green)">[ DÉTECTION #${p.id} ]</strong><br><br>
-                                    STATUT: ${p.alert_label || p.status}<br>
-                                    ZONE: ${p.zone_name || 'HORS CADASTRE'}<br>
-                                    GPS: ${lat}, ${lon}<br><br>
-                                    ${gmapLink}
-                                    <button onclick="navigator.clipboard.writeText('${lat}, ${lon}').then(()=>alert('Coordonnées copiées !'))" class="cyber-btn" style="width:100%; height:30px; margin-bottom:10px; font-size:10px; color:var(--neon-green)">
-                                        <i class="fas fa-copy"></i> COPIER GPS
-                                    </button>
-                                    <a href="/detections/${p.id}/" class="cyber-link" style="width:100%; text-align:center; box-sizing:border-box; display:block;">>> INVESTIGUER</a>
-                                </div>
-                            `);
+                        // Fallback lat/lon for popup (centroid)
+                        const lat = p.latitude ? p.latitude.toFixed(6) : null;
+                        const lon = p.longitude ? p.longitude.toFixed(6) : null;
+                        if (!lat || !lon) return;
+
+                        let footprintLayer;
+                        // ── Render as real polygon footprint if geometry exists ──
+                        if (feature.geometry && feature.geometry.type === 'Polygon') {
+                            footprintLayer = L.geoJSON(feature, {
+                                style: {
+                                    color: color,
+                                    weight: 3,
+                                    opacity: 1,
+                                    fillColor: color,
+                                    fillOpacity: p.alert_level === 'rouge' ? 0.45 :
+                                                 p.alert_level === 'orange' ? 0.35 : 0.25,
+                                    dashArray: p.alert_level === 'veille' ? '4, 6' : null
+                                }
+                            });
+                        } else {
+                            // Fallback: large rectangle for high visibility (~80m × 80m)
+                            const d = 0.0008;
+                            footprintLayer = L.rectangle([
+                                [parseFloat(lat) - d, parseFloat(lon) - d],
+                                [parseFloat(lat) + d, parseFloat(lon) + d]
+                            ], {
+                                color: color, weight: 3, fillColor: color, fillOpacity: 0.35
+                            });
                         }
-                    }).addTo(map);
-                });
+                        
+                        // Pixel-based marker that stays large regardless of zoom
+                        const highlightLayer = L.circleMarker([parseFloat(lat), parseFloat(lon)], {
+                            radius: 12,
+                            color: color,
+                            weight: 2,
+                            fillColor: color,
+                            fillOpacity: 0.2
+                        });
+                        
+                        // Combine both so the user sees a large clickable zone AND the footprint
+                        layer = L.featureGroup([footprintLayer, highlightLayer]);
+
+                        // Store alert_level on the layer for filter functions
+                        layer._alertLevel = p.alert_level;
+                        layer.feature = feature;
+
+                        // Confidence badge
+                        const confPct = p.confidence ? Math.round(p.confidence * 100) : 0;
+                        const confColor = confPct >= 70 ? '#00FF88' : confPct >= 50 ? '#fd7e14' : '#FF4444';
+
+                        // ArcGIS Living Atlas link: uses "longitude,latitude" (X,Y) order
+                        const arcgisUrl = `https://livingatlas.arcgis.com/wayback/#active=34&ext=${lon},${lat},${lon},${lat}&level=18`;
+
+                        const surfaceTxt = p.surface_m2 ? `${Math.round(p.surface_m2)} m²` : 'N/A';
+
+                        layer.bindPopup(`
+                            <div style="font-size:11px; padding:5px; min-width:200px;">
+                                <strong style="color:var(--neon-green)">[ DÉTECTION #${p.id} ]</strong><br>
+                                <span style="color:${color}">■</span> ${(p.alert_label || p.status).replace(/🔴|🟠|🟢|🔵/g,'').trim()}<br><br>
+                                ZONE: <strong>${p.zone_name || 'HORS CADASTRE'}</strong><br>
+                                SURFACE: ${surfaceTxt}<br>
+                                CONFIANCE: <span style="color:${confColor}; font-weight:bold">${confPct}%</span><br>
+                                GPS (centroïde): ${lat}, ${lon}<br><br>
+                                <button onclick="navigator.clipboard.writeText('${lon}, ${lat}').then(()=>alert('Copié ! Format: lon, lat pour ArcGIS'))"
+                                    class="cyber-btn" style="width:100%; height:28px; margin-bottom:6px; font-size:10px; color:var(--neon-green)">
+                                    <i class="fas fa-copy"></i> COPIER (ArcGIS: lon, lat)
+                                </button>
+                                <a href="${arcgisUrl}" target="_blank" class="cyber-link"
+                                    style="width:100%; text-align:center; box-sizing:border-box; display:block; margin-bottom:6px;">
+                                    <i class="fas fa-globe"></i> VOIR SUR ARCGIS LIVING ATLAS
+                                </a>
+                                <a href="/detections/${p.id}/" class="cyber-link" style="width:100%; text-align:center; box-sizing:border-box; display:block;">>> INVESTIGUER</a>
+                            </div>
+                        `);
+
+                        detectionsLayer.addLayer(layer);
+                    });
+
+                    detectionsLayer.addTo(map);
+
+                    if (data.features.length > 0) {
+                        const lats = data.features.map(f => f.properties.latitude).filter(Boolean);
+                        const lons = data.features.map(f => f.properties.longitude).filter(Boolean);
+                        if (lats.length > 0) {
+                            map.fitBounds([
+                                [Math.min(...lats) - 0.002, Math.min(...lons) - 0.002],
+                                [Math.max(...lats) + 0.002, Math.max(...lons) + 0.002]
+                            ]);
+                        }
+                    }
+                })
+                .catch(err => console.error('Erreur chargement détections:', err));
         }
 
         function setActive(element) {
@@ -597,10 +780,21 @@
             element.classList.add('active');
         }
 
+        // Helper: apply style to a layer that might be L.geoJSON (has eachLayer) or L.rectangle
+        function applyLayerStyle(layer, styleObj) {
+            if (typeof layer.setStyle === 'function') {
+                layer.setStyle(styleObj);
+            } else if (typeof layer.eachLayer === 'function') {
+                layer.eachLayer(l => { if (typeof l.setStyle === 'function') l.setStyle(styleObj); });
+            }
+        }
+
         function showAllDetections() {
             if (detectionsLayer) {
                 detectionsLayer.eachLayer(layer => {
-                    layer.setStyle({ opacity: 1, fillOpacity: 0.4 });
+                    const level = layer._alertLevel;
+                    const fi = level === 'rouge' ? 0.45 : level === 'orange' ? 0.35 : 0.25;
+                    applyLayerStyle(layer, { opacity: 1, fillOpacity: fi });
                 });
             }
         }
@@ -608,10 +802,10 @@
         function showRedAlerts() {
             if (detectionsLayer) {
                 detectionsLayer.eachLayer(layer => {
-                    let isRed = layer.feature.properties.alert_level === 'rouge';
-                    layer.setStyle({
-                        opacity: isRed ? 1 : 0.05,
-                        fillOpacity: isRed ? 0.6 : 0.0
+                    const isRed = layer._alertLevel === 'rouge';
+                    applyLayerStyle(layer, {
+                        opacity: isRed ? 1 : 0.06,
+                        fillOpacity: isRed ? 0.5 : 0.02
                     });
                 });
             }
@@ -620,12 +814,50 @@
         function showOrangeAlerts() {
             if (detectionsLayer) {
                 detectionsLayer.eachLayer(layer => {
-                    let isOrange = layer.feature.properties.alert_level === 'orange';
-                    layer.setStyle({
-                        opacity: isOrange ? 1 : 0.05,
-                        fillOpacity: isOrange ? 0.6 : 0.0
+                    const isOrange = layer._alertLevel === 'orange';
+                    applyLayerStyle(layer, {
+                        opacity: isOrange ? 1 : 0.06,
+                        fillOpacity: isOrange ? 0.4 : 0.02
                     });
                 });
+            }
+        }
+
+        function showGreenAlerts() {
+            if (detectionsLayer) {
+                detectionsLayer.eachLayer(layer => {
+                    const isGreen = layer._alertLevel === 'vert';
+                    applyLayerStyle(layer, {
+                        opacity: isGreen ? 1 : 0.06,
+                        fillOpacity: isGreen ? 0.4 : 0.02
+                    });
+                });
+            }
+        }
+
+        function showCyanAlerts() {
+            if (detectionsLayer) {
+                detectionsLayer.eachLayer(layer => {
+                    const isCyan = layer._alertLevel === 'veille';
+                    applyLayerStyle(layer, {
+                        opacity: isCyan ? 1 : 0.06,
+                        fillOpacity: isCyan ? 0.4 : 0.02
+                    });
+                });
+            }
+        }
+
+        let cadastreVisible = true;
+        function toggleCadastre() {
+            const btn = document.getElementById('btn-cadastre');
+            if (cadastreVisible) {
+                if (zonesLayer) map.removeLayer(zonesLayer);
+                cadastreVisible = false;
+                btn.classList.remove('active');
+            } else {
+                if (zonesLayer) map.addLayer(zonesLayer);
+                cadastreVisible = true;
+                btn.classList.add('active');
             }
         }
 
@@ -648,6 +880,32 @@
         setInterval(updateClock, 1000);
         updateClock();
     </script>
+
+    <!-- GLOBAL LOADER (Page Transition) -->
+    <div id="cyber-loader" style="position:fixed; top:0; left:0; width:100vw; height:100vh; background:var(--bg-color, #080808); z-index:9999; display:flex; flex-direction:column; justify-content:center; align-items:center; transition:opacity 0.3s ease;">
+        <div class="pulsing-dot-small" style="width:20px; height:20px; margin-bottom:15px; background:var(--neon-green, #00FF88); box-shadow:0 0 15px var(--neon-green, #00FF88);"></div>
+        <div style="color:var(--neon-green, #00FF88); font-family:var(--font-main, monospace); font-weight:bold; letter-spacing:2px; font-size:14px;">CONNEXION SATELLITE...</div>
+    </div>
+    <script>
+        window.addEventListener('load', function() {
+            const loader = document.getElementById('cyber-loader');
+            if (loader) {
+                loader.style.opacity = '0';
+                setTimeout(() => loader.style.display = 'none', 300);
+            }
+        });
+        document.addEventListener('click', function(e) {
+            const link = e.target.closest('a');
+            if (link && link.href && !link.href.includes('#') && link.target !== '_blank' && !link.hasAttribute('download') && !link.href.includes('javascript:')) {
+                const loader = document.getElementById('cyber-loader');
+                if (loader) {
+                    loader.style.display = 'flex';
+                    setTimeout(() => loader.style.opacity = '1', 10);
+                }
+            }
+        });
+    </script>
+    {% django_browser_reload_script %}
 </body>
 
 </html>

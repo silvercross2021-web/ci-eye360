@@ -6,16 +6,15 @@
 <div class="row mb-4">
     <div class="col-12">
         <nav aria-label="breadcrumb">
-            <ol class="breadcrumb">
-                <li class="breadcrumb-item"><a href="{% url 'dashboard' %}">Dashboard</a></li>
-                <li class="breadcrumb-item"><a href="{% url 'detections_list' %}">Détections</a></li>
-                <li class="breadcrumb-item active">Détection #{{ detection.id }}</li>
+            <ol class="breadcrumb" style="background: rgba(0,0,0,0.3); padding: 10px 15px; border-radius: 8px;">
+                <li class="breadcrumb-item"><a href="{% url 'dashboard' %}" style="color: var(--neon-green);">Dashboard</a></li>
+                <li class="breadcrumb-item"><a href="{% url 'detections_list' %}" style="color: var(--neon-green);">Détections</a></li>
+                <li class="breadcrumb-item active" style="color: rgba(255,255,255,0.7);">Détection #{{ detection.id }}</li>
             </ol>
         </nav>
 
-        <h1 class="h3 mb-3">
-            <i
-                class="fas fa-exclamation-triangle {% if detection.alert_level == 'rouge' %}text-danger{% elif detection.alert_level == 'orange' %}text-warning{% elif detection.alert_level == 'vert' %}text-success{% else %}text-info{% endif %}"></i>
+        <h1 class="h3 mb-3" style="color: white;">
+            <i class="fas fa-crosshairs" style="color: var(--neon-green);"></i>
             Détection #{{ detection.id }}
         </h1>
     </div>
@@ -32,12 +31,20 @@
                     <span class="badge bg-secondary me-2"><i class="fas fa-crosshairs"></i> {{
                         detection.latitude|floatformat:6 }}, {{ detection.longitude|floatformat:6 }}</span>
                     <button class="btn btn-sm btn-outline-primary"
-                        onclick="navigator.clipboard.writeText('{{ detection.latitude|floatformat:6 }}, {{ detection.longitude|floatformat:6 }}').then(() => alert('Coordonnées copiées !'))">
+                        onclick="navigator.clipboard.writeText(`{{ detection.latitude|floatformat:'6u' }}, {{ detection.longitude|floatformat:'6u' }}`).then(() => alert('Coordonnées copiées !'))">
                         <i class="fas fa-copy"></i> Copier
                     </button>
-                    <a href="https://www.google.com/maps/search/?api=1&query={{ detection.latitude|floatformat:6 }},{{ detection.longitude|floatformat:6 }}"
+                    <a href="https://www.google.com/maps/search/?api=1&query={{ detection.latitude|floatformat:'6u' }},{{ detection.longitude|floatformat:'6u' }}"
                         target="_blank" class="btn btn-sm btn-primary">
                         <i class="fas fa-satellite"></i> Google Maps
+                    </a>
+                    <a href="https://earth.google.com/web/search/{{ detection.latitude|floatformat:'6u' }},{{ detection.longitude|floatformat:'6u' }}"
+                        target="_blank" class="btn btn-sm btn-success text-white">
+                        <i class="fas fa-globe-africa"></i> Google Earth 3D
+                    </a>
+                    <a href="https://livingatlas.arcgis.com/wayback/#mapCenter={{ detection.longitude|floatformat:'6u' }}%2C{{ detection.latitude|floatformat:'6u' }}%2C18&mode=swipe&active=16453&swipeWidget=16453%2C48925"
+                        target="_blank" class="btn btn-sm btn-warning text-dark">
+                        <i class="fas fa-layer-group"></i> ArcGIS Living Atlas
                     </a>
                 </div>
                 {% endif %}
@@ -50,76 +57,78 @@
 
     <div class="col-md-4">
         <!-- Informations principales -->
-        <div class="card mb-3">
-            <div class="card-header">
-                <h5 class="mb-0"><i class="fas fa-info-circle"></i> Informations</h5>
+        <div class="card mb-3" style="background: var(--glass-panel); border: 1px solid var(--glass-border);">
+            <div class="card-header border-0">
+                <h5 class="mb-0 text-uppercase" style="font-size: 14px; letter-spacing: 1px;"><i class="fas fa-info-circle"></i> Informations</h5>
             </div>
             <div class="card-body">
                 <div class="mb-3">
-                    <label class="form-label text-muted">Statut</label>
-                    <div>
-                        <span
-                            class="badge {% if detection.alert_level == 'rouge' %}bg-danger{% elif detection.alert_level == 'orange' %}bg-warning{% elif detection.alert_level == 'vert' %}bg-success{% else %}bg-info{% endif %} fs-6">
-                            {{ detection.alert_level|title }}
+                    <label class="form-label" style="color: rgba(255,255,255,0.5); font-size: 11px; text-transform: uppercase;">Statut Alerte</label>
+                    <div style="margin-top: -5px;">
+                        <span class="badge {% if detection.alert_level == 'rouge' %}bg-danger{% elif detection.alert_level == 'orange' %}bg-warning text-dark{% elif detection.alert_level == 'vert' %}bg-success text-dark{% else %}bg-info text-dark{% endif %} px-2 py-1 shadow-sm">
+                            {{ detection.alert_level|upper }}
                         </span>
                     </div>
                 </div>
 
                 <div class="mb-3">
-                    <label class="form-label text-muted">Classification</label>
-                    <div>
-                        <span class="badge bg-secondary fs-6">
+                    <label class="form-label" style="color: rgba(255,255,255,0.5); font-size: 11px; text-transform: uppercase;">Classification IA</label>
+                    <div style="margin-top: -5px;">
+                        <span class="badge border border-info text-info bg-transparent px-2 py-1">
                             {{ detection.get_status_display }}
                         </span>
                     </div>
                 </div>
 
                 <div class="mb-3">
-                    <label class="form-label text-muted">Date de détection</label>
-                    <div class="fw-bold">
-                        {{ detection.date_detection|date:"d/m/Y H:i" }}
+                    <label class="form-label" style="color: rgba(255,255,255,0.5); font-size: 11px; text-transform: uppercase;">Date de détection</label>
+                    <div style="color: white; margin-top: -5px; font-family: var(--font-main);">
+                        <i class="far fa-clock" style="color: var(--neon-green);"></i> {{ detection.date_detection|date:"d/m/Y H:i" }}
                     </div>
                 </div>
 
                 {% if detection.zone_cadastrale %}
                 <div class="mb-3">
-                    <label class="form-label text-muted">Zone Cadastrale</label>
-                    <div>
+                    <label class="form-label" style="color: rgba(255,255,255,0.5); font-size: 11px; text-transform: uppercase;">Zone Cadastrale</label>
+                    <div style="margin-top: -5px;">
                         <a href="{% url 'zone_detail' detection.zone_cadastrale.zone_id %}"
-                            class="text-decoration-none">
-                            <strong>{{ detection.zone_cadastrale.zone_id }}</strong><br>
-                            <small class="text-muted">{{ detection.zone_cadastrale.name }}</small>
+                            style="text-decoration: none; display: flex; align-items: center;">
+                            <i class="fas fa-map-marked-alt fa-2x me-2" style="color: var(--neon-blue);"></i>
+                            <div>
+                                <strong style="color: white;">{{ detection.zone_cadastrale.zone_id }}</strong><br>
+                                <small style="color: rgba(255,255,255,0.6);">{{ detection.zone_cadastrale.name }}</small>
+                            </div>
                         </a>
                     </div>
                 </div>
                 {% endif %}
 
                 {% if detection.verification_required %}
-                <div class="alert alert-warning">
-                    <i class="fas fa-exclamation-triangle"></i>
-                    <strong>Vérification requise</strong>
+                <div style="background: rgba(255,193,7,0.1); border-left: 4px solid #ffc107; padding: 10px; border-radius: 4px;">
+                    <i class="fas fa-exclamation-triangle" style="color: #ffc107;"></i>
+                    <strong style="color: white; margin-left: 5px;">Vérification requise</strong>
                 </div>
                 {% endif %}
             </div>
         </div>
 
         <!-- Données techniques -->
-        <div class="card mb-3">
-            <div class="card-header">
-                <h5 class="mb-0"><i class="fas fa-chart-line"></i> Données Techniques</h5>
+        <div class="card mb-3" style="background: var(--glass-panel); border: 1px solid var(--glass-border);">
+            <div class="card-header border-0">
+                <h5 class="mb-0 text-uppercase" style="font-size: 14px; letter-spacing: 1px;"><i class="fas fa-chart-line"></i> Données Techniques</h5>
             </div>
             <div class="card-body">
                 <div class="row mb-3">
                     <div class="col-6">
-                        <label class="form-label text-muted">NDBI T1 (2024)</label>
-                        <div class="fw-bold">
-                            <code>{{ detection.ndbi_t1|floatformat:3 }}</code>
+                        <label class="form-label" style="color: rgba(255,255,255,0.5); font-size: 11px; text-transform: uppercase;">NDBI T1 (2024)</label>
+                        <div style="color: white; font-family: var(--font-main);">
+                            {{ detection.ndbi_t1|floatformat:3 }}
                         </div>
                     </div>
                     <div class="col-6">
-                        <label class="form-label text-muted">NDBI T2 (2025)</label>
-                        <div class="fw-bold">
-                            <code>{{ detection.ndbi_t2|floatformat:3 }}</code>
+                        <label class="form-label" style="color: rgba(255,255,255,0.5); font-size: 11px; text-transform: uppercase;">NDBI T2 (2025)</label>
+                        <div style="color: white; font-family: var(--font-main);">
+                            {{ detection.ndbi_t2|floatformat:3 }}
                         </div>
                     </div>
                 </div>
@@ -127,9 +136,9 @@
                 {% if detection.bsi_value %}
                 <div class="row mb-3">
                     <div class="col-12">
-                        <label class="form-label text-muted">BSI (Bare Soil Index)</label>
-                        <div class="fw-bold">
-                            <code>{{ detection.bsi_value|floatformat:3 }}</code>
+                        <label class="form-label" style="color: rgba(255,255,255,0.5); font-size: 11px; text-transform: uppercase;">BSI (Bare Soil Index)</label>
+                        <div style="color: white; font-family: var(--font-main);">
+                            {{ detection.bsi_value|floatformat:3 }}
                         </div>
                     </div>
                 </div>
@@ -137,23 +146,25 @@
 
                 <div class="row mb-3">
                     <div class="col-6">
-                        <label class="form-label text-muted">Surface</label>
-                        <div class="fw-bold">
+                        <label class="form-label" style="color: rgba(255,255,255,0.5); font-size: 11px; text-transform: uppercase;">Surface</label>
+                        <div style="color: var(--neon-green); font-family: var(--font-main); font-weight: bold; font-size: 16px;">
                             {% if detection.surface_m2 %}
                             {{ detection.surface_m2|floatformat:0 }} m²
                             {% else %}
-                            <span class="text-muted">-</span>
+                            <span style="color: rgba(255,255,255,0.3);">-</span>
                             {% endif %}
                         </div>
                     </div>
                     <div class="col-6">
-                        <label class="form-label text-muted">Confiance</label>
-                        <div class="fw-bold">
-                            <div class="progress" style="height: 20px;">
+                        <label class="form-label" style="color: rgba(255,255,255,0.5); font-size: 11px; text-transform: uppercase;">Confiance IA</label>
+                        <div>
+                            <div class="progress" style="height: 6px; background: rgba(255,255,255,0.1); border-radius: 3px; overflow: hidden; margin-bottom: 4px;">
                                 <div class="progress-bar {% if detection.confidence > 0.7 %}bg-success{% elif detection.confidence > 0.5 %}bg-warning{% else %}bg-danger{% endif %}"
                                     data-width-percent="{% widthratio detection.confidence 1 100 %}">
-                                    {% widthratio detection.confidence 1 100 %}%
                                 </div>
+                            </div>
+                            <div class="text-end" style="font-size: 11px; color: rgba(255,255,255,0.7); font-family: var(--font-main);">
+                                <span style="color: white; font-weight: bold;">{% widthratio detection.confidence 1 100 %}%</span>
                             </div>
                         </div>
                     </div>
@@ -171,7 +182,7 @@
                         </div>
                     </div>
                     <div class="col-6">
-                        <label class="form-label text-muted">Présent Microsoft</label>
+                        <label class="form-label text-muted">Présent Google Buildings</label>
                         <div>
                             {% if detection.present_in_microsoft %}
                             <span class="badge bg-warning">Oui</span>
@@ -185,55 +196,56 @@
         </div>
 
         <!-- CORRECTIF C2 : Bouton Traiter câblé à l'API /api/v1/detections/{id}/traiter/ -->
-        <div class="card">
-            <div class="card-header">
-                <h5 class="mb-0"><i class="fas fa-tools"></i> Actions Agent Terrain</h5>
+        <div class="card" style="background: var(--glass-panel); border: 1px solid var(--glass-border);">
+            <div class="card-header border-0">
+                <h5 class="mb-0 text-uppercase" style="font-size: 14px; letter-spacing: 1px;"><i class="fas fa-tools"></i> Actions Agent Terrain</h5>
             </div>
             <div class="card-body">
                 <div class="d-grid gap-2 mb-3">
-                    <a href="{% url 'detections_list' %}" class="btn btn-outline-secondary">
+                    <a href="{% url 'detections_list' %}" class="btn btn-outline-secondary text-white" style="border-color: rgba(255,255,255,0.3);">
                         <i class="fas fa-arrow-left"></i> Retour à la liste
                     </a>
                     <button class="btn btn-outline-info" onclick="exportDetection()">
-                        <i class="fas fa-download"></i> Exporter cette détection
+                        <i class="fas fa-download"></i> Exporter le rapport
                     </button>
                 </div>
 
                 {% if is_traitement_pending %}
                 <!-- Formulaire de traitement terrain -->
-                <hr>
-                <h6 class="text-muted"><i class="fas fa-clipboard-check"></i> Traitement terrain</h6>
+                <hr style="border-top-color: rgba(255,255,255,0.1);">
+                <h6 style="color: rgba(255,255,255,0.6); font-size: 12px; text-transform: uppercase; margin-bottom: 15px;"><i class="fas fa-clipboard-check"></i> Formulaire Traitement</h6>
                 <div class="mb-3">
-                    <label for="input-commentaire" class="form-label">Commentaire <span
+                    <label for="input-commentaire" class="form-label text-white">Commentaire d'inspection <span
                             class="text-danger">*</span></label>
-                    <textarea id="input-commentaire" class="form-control" rows="3"
-                        placeholder="Décrivez votre observation terrain (obligatoire pour confirmer ou rejeter)..."></textarea>
+                    <textarea id="input-commentaire" class="form-control text-white" rows="3"
+                        placeholder="Observation terrain (obligatoire pour confirmation)..." style="background: rgba(0,0,0,0.5); border: 1px solid rgba(255,255,255,0.2);"></textarea>
                 </div>
                 <div class="d-grid gap-2">
-                    <button class="btn btn-success" onclick="traiterDetection('confirme')">
-                        <i class="fas fa-check-circle"></i> Confirmer la détection
+                    <button class="btn btn-success" onclick="traiterDetection('confirme')" style="box-shadow: 0 0 10px rgba(25,135,84,0.3);">
+                        <i class="fas fa-check-circle"></i> CONFIRMER DÉTECTION
                     </button>
                     <button class="btn btn-warning" onclick="traiterDetection('en_investigation')">
-                        <i class="fas fa-search"></i> Mettre en investigation
+                        <i class="fas fa-search"></i> INVESTIGATION REQUISE
                     </button>
-                    <button class="btn btn-outline-secondary" onclick="traiterDetection('faux_positif')">
-                        <i class="fas fa-times-circle"></i> Faux positif
+                    <button class="btn btn-danger" onclick="traiterDetection('faux_positif')">
+                        <i class="fas fa-times-circle"></i> SIGNALER FAUX POSITIF
                     </button>
                 </div>
                 {% else %}
-                <div class="alert alert-success">
-                    <i class="fas fa-check"></i>
-                    <strong>Traité</strong> : {{ detection.get_statut_traitement_display }}
+                <div style="background: rgba(25,135,84,0.1); border-left: 4px solid #198754; padding: 10px; border-radius: 4px; color: white; margin-bottom: 15px;">
+                    <i class="fas fa-check-circle" style="color: #198754;"></i>
+                    <strong>Statut:</strong> {{ detection.get_statut_traitement_display }}
                     {% if detection.date_traitement %}
-                    <br><small>Le {{ detection.date_traitement|date:"d/m/Y à H:i" }}</small>
+                    <br><small style="color: rgba(255,255,255,0.6);">Date: {{ detection.date_traitement|date:"d/m/Y à H:i" }}</small>
                     {% endif %}
                     {% if detection.traitee_par %}
-                    <br><small>Par : {{ detection.traitee_par }}</small>
+                    <br><small style="color: rgba(255,255,255,0.6);">Par: {{ detection.traitee_par }}</small>
                     {% endif %}
                 </div>
                 {% if detection.commentaire_terrain %}
-                <div class="alert alert-light border mt-2">
-                    <i class="fas fa-comment"></i> {{ detection.commentaire_terrain }}
+                <div style="background: rgba(255,255,255,0.05); padding: 15px; border-radius: 4px; border: 1px solid rgba(255,255,255,0.1); color: white;">
+                    <i class="fas fa-quote-left" style="color: var(--neon-blue); opacity: 0.5; margin-right: 5px;"></i> 
+                    <em>{{ detection.commentaire_terrain }}</em>
                 </div>
                 {% endif %}
                 {% endif %}
@@ -318,6 +330,33 @@
         </div>
     </div>
 </div>
+
+<!-- B25 : Comparateur Visuel Avant/Après — ArcGIS Wayback (gratuit, sans clé) -->
+<div class="row mt-4">
+    <div class="col-12">
+        <div class="card">
+            <div class="card-header d-flex justify-content-between align-items-center bg-dark text-white">
+                <h5 class="mb-0"><i class="fas fa-columns"></i> Comparaison Visuelle Avant / Après</h5>
+                <span class="badge bg-success">Imagerie Satellite HD — Gratuit</span>
+            </div>
+            <div class="card-body p-0">
+                {% if detection.latitude and detection.longitude %}
+                <div style="height: 500px; width: 100%; padding: 0;">
+                    <iframe src="https://livingatlas.arcgis.com/wayback/#mapCenter={{ detection.longitude|floatformat:'6u' }}%2C{{ detection.latitude|floatformat:'6u' }}%2C18&mode=swipe&active=16453&swipeWidget=16453%2C48925"
+                        width="100%" height="100%" frameborder="0" style="border: none; border-bottom-left-radius: 4px; border-bottom-right-radius: 4px;">
+                    </iframe>
+                </div>
+                {% else %}
+                <div class="p-5 text-center text-muted">
+                    <i class="fas fa-satellite-dish fa-3x mb-3"></i>
+                    <p>Données GPS insuffisantes pour le comparateur visuel.</p>
+                </div>
+                {% endif %}
+            </div>
+        </div>
+    </div>
+</div>
+
 {% endblock %}
 
 {% block extra_js %}
@@ -335,9 +374,9 @@
     function initDetailMap() {
         const map = L.map('detail-map').setView([5.30, -4.00], 15);
 
-        L.tileLayer('https://mt1.google.com/vt/lyrs=s&x={x}&y={y}&z={z}', {
+        L.tileLayer('https://mt1.google.com/vt/lyrs=y&x={x}&y={y}&z={z}', {
             attribution: 'Tiles &copy; Google',
-            maxZoom: 20
+            maxZoom: 21
         }).addTo(map);
 
         // Couleur selon niveau d'alerte
@@ -447,6 +486,8 @@
         document.body.removeChild(a);
         window.URL.revokeObjectURL(url);
     }
+
+    // Fonction initWaybackMaps supprimée (remplacée par Iframe directe ArcGIS)
 
     // Initialiser au chargement
     document.addEventListener('DOMContentLoaded', () => {

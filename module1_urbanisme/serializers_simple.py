@@ -66,4 +66,4 @@ class DetectionConstructionSimpleSerializer(serializers.ModelSerializer):
             'conforme': '🟢 Développement Conforme',
             'surveillance_preventive': '🔵 Surveillance Préventive',
         }
-        return labels.get(obj.status, obj.status_display)
+        return labels.get(obj.status, obj.get_status_display())

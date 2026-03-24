@@ -9,14 +9,15 @@ CORRECTIFS APPLIQUÉS :
 import os
 from datetime import date
 
+from typing import Optional, Dict
 from django.conf import settings
 from django.core.management.base import BaseCommand
 
 from module1_urbanisme.models import ImageSatellite
 
 
-# Chemin relatif au dossier sentinel (depuis BASE_DIR)
-SENTINEL_RELATIVE_PATH = os.path.join("module1_urbanisme", "data_use", "sentinel")
+# Chemin relatif au dossier sentinel_api_exports (depuis BASE_DIR)
+SENTINEL_RELATIVE_PATH = os.path.join("module1_urbanisme", "data_use", "sentinel_api_exports")
 
 
 class Command(BaseCommand):
@@ -83,46 +84,79 @@ class Command(BaseCommand):
 
     # ─────────────────────────────────────────────────────────────────────
     def _analyze_sentinel_files(self, folder_path: str) -> dict:
-        """Analyse les fichiers TIFF Sentinel dans le dossier et les groupe par date."""
+        """
+        Analyse les fichiers TIF Sentinel dans le dossier et les groupe par date.
+        
+        Supporte deux structures :
+        1. Nouveau format (sentinel_api_exports) : sous-dossiers par date
+           ex: 2024-02-15/B04_2024-02-15.tif
+        2. Ancien format (flat) : tous les TIFF dans le même dossier
+           ex: 2024-01-29-00-00_..._B08_(Raw).tiff
+        """
         images_by_date: dict = {}
 
         try:
-            for filename in sorted(os.listdir(folder_path)):
-                if not filename.lower().endswith(".tiff"):
-                    continue
-
-                file_info = self._parse_sentinel_filename(filename)
-                if not file_info:
-                    continue
-
-                date_str = file_info["date"]
-                if date_str not in images_by_date:
-                    images_by_date[date_str] = {
-                        "date": file_info["date_obj"],
-                        "bands": {},
-                        "classification": None,
-                    }
-
-                # CORRECTIF A8 : stocker le chemin ABSOLU du fichier
-                abs_path = os.path.join(folder_path, filename)
-
-                if "classification_map" in filename.lower():
-                    images_by_date[date_str]["classification"] = abs_path
-                elif "B04" in filename:
-                    images_by_date[date_str]["bands"]["B04"] = abs_path
-                elif "B08" in filename:
-                    images_by_date[date_str]["bands"]["B08"] = abs_path
-                elif "B11" in filename:
-                    images_by_date[date_str]["bands"]["B11"] = abs_path
-                elif "B12" in filename:
-                    images_by_date[date_str]["bands"]["B12"] = abs_path
+            items = sorted(os.listdir(folder_path))
+            
+            # Détecter si c'est le nouveau format (sous-dossiers par date)
+            subdirs = [d for d in items if os.path.isdir(os.path.join(folder_path, d))]
+            
+            if subdirs:
+                # Format sentinel_api_exports : sous-dossiers YYYY-MM-DD/
+                for date_dir in subdirs:
+                    dir_path = os.path.join(folder_path, date_dir)
+                    try:
+                        date_obj = date.fromisoformat(date_dir)
+                    except ValueError:
+                        continue  # Pas un sous-dossier de date
+                    
+                    date_str = date_dir
+                    images_by_date[date_str] = {"date": date_obj, "bands": {}, "classification": None}
+                    
+                    for filename in sorted(os.listdir(dir_path)):
+                        if not filename.lower().endswith((".tif", ".tiff")):
+                            continue
+                        abs_path = os.path.join(dir_path, filename)
+                        fname_upper = filename.upper()
+                        if "SCL" in fname_upper:
+                            images_by_date[date_str]["classification"] = abs_path
+                        elif "B04" in fname_upper:
+                            images_by_date[date_str]["bands"]["B04"] = abs_path
+                        elif "B08" in fname_upper:
+                            images_by_date[date_str]["bands"]["B08"] = abs_path
+                        elif "B11" in fname_upper:
+                            images_by_date[date_str]["bands"]["B11"] = abs_path
+                        elif "B12" in fname_upper:
+                            images_by_date[date_str]["bands"]["B12"] = abs_path
+            else:
+                # Ancien format flat : tous les TIFF dans le même dossier
+                for filename in items:
+                    if not filename.lower().endswith((".tiff", ".tif")):
+                        continue
+                    file_info = self._parse_sentinel_filename(filename)
+                    if not file_info:
+                        continue
+                    date_str = file_info["date"]
+                    if date_str not in images_by_date:
+                        images_by_date[date_str] = {"date": file_info["date_obj"], "bands": {}, "classification": None}
+                    abs_path = os.path.join(folder_path, filename)
+                    if "classification_map" in filename.lower():
+                        images_by_date[date_str]["classification"] = abs_path
+                    elif "B04" in filename:
+                        images_by_date[date_str]["bands"]["B04"] = abs_path
+                    elif "B08" in filename:
+                        images_by_date[date_str]["bands"]["B08"] = abs_path
+                    elif "B11" in filename:
+                        images_by_date[date_str]["bands"]["B11"] = abs_path
+                    elif "B12" in filename:
+                        images_by_date[date_str]["bands"]["B12"] = abs_path
 
         except Exception as e:
             self.stdout.write(self.style.ERROR(f"Erreur analyse dossier : {str(e)}"))
 
         return images_by_date
 
-    def _parse_sentinel_filename(self, filename: str) -> dict | None:
+    def _parse_sentinel_filename(self, filename: str) -> Optional[Dict]:
         """
         Parse le nom de fichier Sentinel-2.
         Format attendu : 2024-01-29-00-00_2024-01-29-23-59_Sentinel-2_L2A_B08_(Raw).tiff

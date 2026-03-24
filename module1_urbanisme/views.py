@@ -60,7 +60,7 @@ class DetectionConstructionViewSet(viewsets.ModelViewSet):
         'zone_cadastrale', 'verification_required'
     ]
     search_fields = ['commentaire_terrain', 'zone_cadastrale__name']
-    ordering_fields = ['date_detection', 'priority_score', 'surface_m2']
+    ordering_fields = ['date_detection', 'surface_m2', 'confidence', 'ndbi_t2', 'status', 'alert_level']
     ordering = ['-date_detection']
     
     def get_serializer_class(self):
@@ -211,3 +211,4 @@ class DashboardViewSet(viewsets.GenericViewSet):
                 zones_plus_actives, many=True
             ).data
         })
+

@@ -68,10 +68,16 @@ git push -u origin feature/module2-analyse-vegetation
 ❌ **Faire des migrations de base de données en conflit :** Si vous touchez à vos `models.py`, générez vos migrations (`python manage.py makemigrations nom_du_module`) et commitez ce fichier de migration. NE MODIFIEZ PAS les migrations des autres.
 ❌ **Écraser les `requirements.txt` :** Si vous installez une nouvelle librairie (ex: `pip install librosa`), ajoutez-la proprement à la fin du `requirements.txt` (`pip freeze > requirements.txt` écraserait la mise en page propre actuelle).
 
-## 💡 5. ASTUCE : GÉRER LES CONFLITS "MERGE CONFLICTS"
-Si GitHub vous annonce qu'il ne peut pas fusionner automatiquement car quelqu'un a touché au même fichier que vous (par exemple `config/urls.py`) :
+## 💡 5. NORMES TECHNIQUES (PIPELINE & IA)
+Pour garantir la précision des détections du Module 1 :
+*   **Indices Spectraux :** Toute modification de `ndbi_calculator.py` doit être validée par un test unitaire (`tests.py`).
+*   **Modèles IA :** Les nouveaux poids de modèles (PyTorch/Sklearn) doivent être placés dans `module1_urbanisme/data_use/weights/`. Ne jamais commiter de fichiers `.pth` > 50Mo (utiliser Git LFS si nécessaire).
+*   **Données Satellitaires :** Toujours privilégier les fonctions de `sentinel_data_fetcher.py` pour l'acquisition afin de maintenir la compatibilité multi-source.
+
+## 💡 6. ASTUCE : GÉRER LES CONFLITS "MERGE CONFLICTS"
+Si GitHub vous annonce qu'il ne peut pas fusionner automatiquement car quelqu'un a touché au même fichier que vous :
 1. Sur votre branche : `git pull origin main`
 2. Ouvrez le fichier en conflit dans votre éditeur (VSCode).
-3. Résolvez le conflit (conservez les deux lignes).
-4. `git add le_fichier` puis `git commit -m "fix: résolution de conflit url"`
+3. Résolvez le conflit proprement.
+4. `git add le_fichier` puis `git commit -m "fix: résolution de conflit"`
 5. Relancez le `git push`.

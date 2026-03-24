@@ -6,59 +6,57 @@
 <div class="row mb-4">
     <div class="col-12">
         <nav aria-label="breadcrumb">
-            <ol class="breadcrumb">
-                <li class="breadcrumb-item"><a href="{% url 'dashboard' %}">Dashboard</a></li>
-                <li class="breadcrumb-item"><a href="{% url 'zones_cadastrales' %}">Zones</a></li>
-                <li class="breadcrumb-item active">Zone {{ zone.zone_id }}</li>
+            <ol class="breadcrumb" style="background: rgba(0,0,0,0.3); padding: 10px 15px; border-radius: 8px;">
+                <li class="breadcrumb-item"><a href="{% url 'dashboard' %}" style="color: var(--neon-blue);">Dashboard</a></li>
+                <li class="breadcrumb-item"><a href="{% url 'zones_cadastrales' %}" style="color: var(--neon-blue);">Zones</a></li>
+                <li class="breadcrumb-item active" style="color: rgba(255,255,255,0.7);">Zone {{ zone.zone_id }}</li>
             </ol>
         </nav>
-        <h1 class="h3 mb-3">
-            <i class="fas fa-map-marker-alt text-primary"></i> Zone Cadastrale : {{ zone.name }}
+        <h1 class="h3 mb-3" style="color: white;">
+            <i class="fas fa-map-marker-alt" style="color: var(--neon-blue);"></i> Zone Cadastrale : {{ zone.name }}
         </h1>
     </div>
 </div>
 
 <div class="row">
     <div class="col-md-6">
-        <div class="card mb-4 shadow-sm">
-            <div class="card-header">
-                <h5 class="mb-0"><i class="fas fa-info-circle"></i> Informations</h5>
+        <div class="card mb-4" style="background: var(--glass-panel); border: 1px solid var(--glass-border);">
+            <div class="card-header border-0">
+                <h5 class="mb-0 text-uppercase" style="font-size: 14px; letter-spacing: 1px;"><i class="fas fa-info-circle"></i> Informations</h5>
             </div>
             <div class="card-body">
-                <p><strong>Identifiant :</strong> {{ zone.zone_id }}</p>
-                <p><strong>Nom :</strong> {{ zone.name }}</p>
-                <p><strong>Région :</strong> {{ zone.region }}</p>
-                <p><strong>Département :</strong> {{ zone.department }}</p>
+                <p><strong>Identifiant :</strong> <span style="color: var(--neon-blue);">{{ zone.zone_id }}</span></p>
+                <p><strong>Nom :</strong> <span class="text-white">{{ zone.name }}</span></p>
+                <p><strong>Type de zone :</strong> <span class="badge border border-info text-info bg-transparent px-2 py-1">{{ zone.zone_type|upper }}</span></p>
                 <p><strong>Statut de constructibilité :</strong>
                     <span
-                        class="badge {% if zone.buildable_status == 'buildable' %}bg-success{% elif zone.buildable_status == 'conditional' %}bg-warning{% else %}bg-danger{% endif %}">
-                        {{ zone.get_buildable_status_display }}
+                        class="badge {% if zone.buildable_status == 'buildable' %}bg-success text-dark{% elif zone.buildable_status == 'conditional' %}bg-warning text-dark{% else %}bg-danger text-white{% endif %}">
+                        {{ zone.get_buildable_status_display|upper }}
                     </span>
                 </p>
-                <p><strong>Surface :</strong> {% if zone.surface_m2 %}{{ zone.surface_m2|floatformat:0 }} m²{% else
-                    %}-{% endif %}</p>
+                <p><strong>Géométrie :</strong> {% if zone.geometry %}<span style="color: var(--neon-green);">Disponible</span>{% else %}<span style="color: rgba(255,255,255,0.4);">Non définie</span>{% endif %}</p>
             </div>
         </div>
     </div>
 
     <div class="col-md-6">
-        <div class="card mb-4 shadow-sm">
-            <div class="card-header">
-                <h5 class="mb-0"><i class="fas fa-list"></i> Détections associées ({{ detection_count }})</h5>
+        <div class="card mb-4" style="background: var(--glass-panel); border: 1px solid var(--glass-border);">
+            <div class="card-header border-0">
+                <h5 class="mb-0 text-uppercase" style="font-size: 14px; letter-spacing: 1px;"><i class="fas fa-list"></i> Détections associées ({{ detection_count }})</h5>
             </div>
             <div class="card-body p-0">
-                <div class="list-group list-group-flush">
+                <div class="list-group list-group-flush" style="background: transparent;">
                     {% for detection in detections %}
-                    <a href="{% url 'detection_detail' detection.id %}" class="list-group-item list-group-item-action">
+                    <a href="{% url 'detection_detail' detection.id %}" class="list-group-item list-group-item-action border-0" style="background: transparent; color: white; border-bottom: 1px solid rgba(255,255,255,0.1) !important; transition: 0.2s;" onmouseover="this.style.background='rgba(255,255,255,0.05)'" onmouseout="this.style.background='transparent'">
                         <div class="d-flex w-100 justify-content-between">
-                            <h6 class="mb-1">Détection #{{ detection.id }}</h6>
-                            <small>{{ detection.date_detection|date:"d/m/Y H:i" }}</small>
+                            <h6 class="mb-1" style="color: var(--neon-green);">Détection #{{ detection.id }}</h6>
+                            <small style="color: rgba(255,255,255,0.5);">{{ detection.date_detection|date:"d/m/Y H:i" }}</small>
                         </div>
-                        <p class="mb-1">Statut: {{ detection.get_status_display }}</p>
+                        <p class="mb-1" style="font-size: 14px;"><span style="color: rgba(255,255,255,0.6);">Statut:</span> {{ detection.get_status_display }}</p>
                         <small>
                             <span
-                                class="badge {% if detection.alert_level == 'rouge' %}bg-danger{% elif detection.alert_level == 'orange' %}bg-warning{% elif detection.alert_level == 'vert' %}bg-success{% else %}bg-info{% endif %}">
-                                {{ detection.alert_level|title }}
+                                class="badge {% if detection.alert_level == 'rouge' %}bg-danger{% elif detection.alert_level == 'orange' %}bg-warning text-dark{% elif detection.alert_level == 'vert' %}bg-success text-dark{% else %}bg-info text-dark{% endif %}">
+                                {{ detection.alert_level|upper }}
                             </span>
                         </small>
                     </a>

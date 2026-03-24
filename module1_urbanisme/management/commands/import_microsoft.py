@@ -10,6 +10,7 @@ import json
 import os
 from django.core.management.base import BaseCommand
 from django.db import transaction
+from django.contrib.gis.geos import GEOSGeometry  # ← NOUVEAU POUR POSTGIS
 from module1_urbanisme.models import MicrosoftFootprint
 
 
@@ -176,7 +177,8 @@ class Command(BaseCommand):
         """Extrait les données d'une feature GeoJSON pour créer un MicrosoftFootprint."""
         geometry = feature.get("geometry")
         return {
-            "geometry_geojson": json.dumps(geometry),
+            "geometry": GEOSGeometry(json.dumps(geometry)),
+            "source": "Google_Open_Buildings_V3",  # BUG-005 : Préciser la source réelle
             "source_file": "Abidjan_33333010.geojsonl",
             "date_reference": "~2023-2024",
         }

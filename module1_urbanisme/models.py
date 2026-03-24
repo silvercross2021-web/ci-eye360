@@ -1,4 +1,4 @@
-from django.db import models
+from django.contrib.gis.db import models
 from django.contrib.auth.models import User
 
 
@@ -15,7 +15,8 @@ class ZoneCadastrale(models.Model):
     name = models.CharField(max_length=200)
     zone_type = models.CharField(max_length=50)  # harbour, residential, commercial, etc.
     buildable_status = models.CharField(max_length=20, choices=BUILDABLE_STATUS_CHOICES)
-    geometry_geojson = models.TextField(help_text="Géométrie en format GeoJSON (temporaire pour SQLite)")
+    # GÉOMÉTRIE POSTGIS NATIVE
+    geometry = models.PolygonField(srid=4326, null=True, help_text="Géométrie spatiale PostGIS")
     metadata = models.JSONField(default=dict)
     
     class Meta:
@@ -25,6 +26,11 @@ class ZoneCadastrale(models.Model):
     def __str__(self):
         return f"{self.zone_id} - {self.name}"
 
+    @property
+    def geometry_geojson(self):
+        """Propriété de compatibilité pour le frontend : retourne le GeoJSON de la géométrie."""
+        return self.geometry.json if self.geometry else None
+
 
 class ImageSatellite(models.Model):
     """Image satellite Sentinel-2 pour traitement NDBI"""
@@ -32,7 +38,8 @@ class ImageSatellite(models.Model):
     date_acquisition = models.DateField()
     satellite = models.CharField(max_length=50, default='Sentinel-2')
     bands = models.JSONField(default=dict)  # Chemins vers les fichiers B04, B08, B11, B12
-    classification_map = models.FileField(upload_to='sentinel/classification/')
+    classification_map = models.CharField(max_length=500, blank=True, null=True,
+        help_text="Chemin absolu vers le fichier SCL (Scene Classification Layer)")
     processed = models.BooleanField(default=False)
     
     class Meta:
@@ -44,21 +51,42 @@ class ImageSatellite(models.Model):
 
 
 class MicrosoftFootprint(models.Model):
-    """Bâtiments existants avant la période de surveillance (vérité terrain Microsoft)"""
+    """
+    Bâtiments existants avant la période de surveillance (vérité terrain).
     
-    geometry_geojson = models.TextField(help_text="Géométrie en format GeoJSON (temporaire pour SQLite)")
-    source_file = models.CharField(max_length=100, default='Abidjan_33333010.geojsonl')
-    date_reference = models.CharField(max_length=50, default='~2023-2024')
+    Source actuelle : Google Open Buildings V3 (mai 2023, 50cm/pixel, CC-BY 4.0)
+    Source historique : Microsoft Building Footprints (obsolète, données 2020)
+    
+    Le nom du modèle est conservé pour compatibilité avec les migrations existantes.
+    """
+    
+    SOURCE_CHOICES = [
+        ('Google_V3_2023', 'Google Open Buildings V3 (mai 2023)'),
+        ('Google_Temporal_V1', 'Google Open Buildings Temporal V1'),
+        ('Microsoft_2020', 'Microsoft Building Footprints (obsolète)'),
+    ]
+    
+    # GÉOMÉTRIE POSTGIS NATIVE
+    geometry = models.PolygonField(srid=4326, null=True, help_text="Géométrie spatiale PostGIS")
+    source_file = models.CharField(max_length=255, default='google_open_buildings_v3')
+    source = models.CharField(max_length=30, choices=SOURCE_CHOICES, default='Google_V3_2023')
+    date_reference = models.CharField(max_length=50, default='2023-05')
+    confidence_score = models.FloatField(
+        null=True, blank=True,
+        help_text="Score de confiance Google Open Buildings (0.65-1.0). Rouge: 0.65-0.70, Jaune: 0.70-0.75, Vert: >=0.75"
+    )
     
     class Meta:
-        verbose_name = "Empreinte Microsoft"
-        verbose_name_plural = "Empreintes Microsoft"
+        verbose_name = "Empreinte Bâtiment"
+        verbose_name_plural = "Empreintes Bâtiments"
         indexes = [
             models.Index(fields=['source_file']),
+            models.Index(fields=['source']),
+            models.Index(fields=['confidence_score']),
         ]
     
     def __str__(self):
-        return f"Microsoft Footprint {self.id}"
+        return f"Building Footprint {self.id} ({self.source})"
 
 
 class DetectionConstruction(models.Model):
@@ -95,7 +123,9 @@ class DetectionConstruction(models.Model):
 
     date_detection = models.DateTimeField(auto_now_add=True)
     zone_cadastrale = models.ForeignKey(ZoneCadastrale, on_delete=models.CASCADE, null=True)
-    geometry_geojson = models.TextField(help_text="Géométrie en format GeoJSON (temporaire pour SQLite)")
+    
+    # GÉOMÉTRIE POSTGIS NATIVE
+    geometry = models.PolygonField(srid=4326, null=True, help_text="Géométrie spatiale PostGIS")
     
     # Indices calculés
     ndbi_t1 = models.FloatField(help_text="Valeur NDBI sur image T1 (référence)")
@@ -133,27 +163,22 @@ class DetectionConstruction(models.Model):
         return f"Détection {self.id} - {self.get_status_display()} ({self.get_alert_level_display()})"
 
     @property
+    def geometry_geojson(self):
+        """Propriété de compatibilité pour le frontend : retourne le GeoJSON de la géométrie."""
+        return self.geometry.json if self.geometry else None
+
     def get_centroid_coordinates(self):
         """
-        Calcule le point central exact du polygone avec la méthode du Centroïde (WGS84 EPSG:4326).
+        Calcule le point central exact du polygone avec la méthode du Centroïde native PostGIS.
         Format: {'latitude': float, 'longitude': float}
         """
-        import json
         try:
-            if not self.geometry_geojson:
+            if not self.geometry:
                 return {"latitude": None, "longitude": None}
                 
-            geom = json.loads(self.geometry_geojson)
-            if geom.get('type') == 'Polygon':
-                coords = geom.get('coordinates', [[]])[0]
-                if coords:
-                    lats = [c[1] for c in coords]
-                    lons = [c[0] for c in coords]
-                    # Centroïde mathématique simple : 
-                    # Note : avec PostGIS ce serait ST_Centroid(geometry)
-                    lat = sum(lats) / len(lats)
-                    lon = sum(lons) / len(lons)
-                    return {"latitude": round(lat, 6), "longitude": round(lon, 6)}
+            centroid = self.geometry.centroid
+            # GeoDjango Point: x=longitude, y=latitude
+            return {"latitude": round(centroid.y, 6), "longitude": round(centroid.x, 6)}
         except Exception:
             pass
             
@@ -161,8 +186,8 @@ class DetectionConstruction(models.Model):
 
     @property
     def latitude(self):
-        return self.get_centroid_coordinates.get("latitude")
+        return self.get_centroid_coordinates().get("latitude")
 
     @property
     def longitude(self):
-        return self.get_centroid_coordinates.get("longitude")
+        return self.get_centroid_coordinates().get("longitude")

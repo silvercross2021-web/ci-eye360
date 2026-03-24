@@ -63,12 +63,15 @@ def detections_list(request):
     if alert_level_filter:
         detections = detections.filter(alert_level=alert_level_filter)
     
+    dernieres = DetectionConstruction.objects.select_related('zone_cadastrale').order_by('-date_detection')[:10]
+    
     context = {
         'detections': detections,
         'status_filter': status_filter,
         'alert_level_filter': alert_level_filter,
         'status_choices': DetectionConstruction.STATUS_CHOICES,
-        'alert_level_choices': DetectionConstruction.ALERT_LEVEL_CHOICES
+        'alert_level_choices': DetectionConstruction.ALERT_LEVEL_CHOICES,
+        'dernieres_detections': dernieres
     }
     
     return render(request, 'module1/detections_list.html', context)
@@ -88,6 +91,7 @@ def detection_detail(request, detection_id):
             'zone_geometry': None,
             'ndbi_increased': (detection.ndbi_t2 or 0) > (detection.ndbi_t1 or 0),
             'is_traitement_pending': detection.statut_traitement in ['en_attente', 'en_investigation'],
+            'dernieres_detections': DetectionConstruction.objects.select_related('zone_cadastrale').order_by('-date_detection')[:10]
         }
         
         if detection.zone_cadastrale and detection.zone_cadastrale.geometry_geojson:
@@ -106,7 +110,8 @@ def zones_cadastrales(request):
     ).order_by('zone_id')
     
     context = {
-        'zones': zones
+        'zones': zones,
+        'dernieres_detections': DetectionConstruction.objects.select_related('zone_cadastrale').order_by('-date_detection')[:10]
     }
     
     return render(request, 'module1/zones_cadastrales.html', context)
@@ -121,7 +126,8 @@ def zone_detail(request, zone_id):
         context = {
             'zone': zone,
             'detections': detections,
-            'detection_count': detections.count()
+            'detection_count': detections.count(),
+            'dernieres_detections': DetectionConstruction.objects.select_related('zone_cadastrale').order_by('-date_detection')[:10]
         }
         
         return render(request, 'module1/zone_detail.html', context)

@@ -3,13 +3,19 @@
 {% block title %}Détections - CIV-Eye Module 1{% endblock %}
 
 {% block content %}
-<div class="row mb-4">
-    <div class="col-12">
-        <h1 class="h3 mb-3">
-            <i class="fas fa-exclamation-triangle text-primary"></i>
-            Liste des Détections
+<div class="row mb-4 align-items-center">
+    <div class="col-md-8">
+        <h1 class="h3 mb-2" style="color: var(--neon-green); text-shadow: 0 0 10px rgba(0,255,136,0.3);">
+            <i class="fas fa-satellite-dish"></i> LA CHAÎNE DE DÉTECTION
         </h1>
-        <p class="text-muted">Visualisation et gestion de toutes les détections automatiques</p>
+        <p style="color: rgba(255,255,255,0.7); font-size: 14px; margin: 0;">
+            Journal d'activité spatial — Suivi, analyse et investigation des constructions détectées par l'Intelligence Artificielle.
+        </p>
+    </div>
+    <div class="col-md-4 text-end">
+        <div style="background: var(--glass-panel); border: 1px solid var(--glass-border); padding: 10px; border-radius: 8px; display: inline-block;">
+            <span style="color: rgba(255,255,255,0.5); font-size: 11px;">SYSTÈME:</span> <span style="color: var(--neon-green);"><i class="fas fa-check-circle"></i> OPÉRATIONNEL</span>
+        </div>
     </div>
 </div>
 
@@ -18,9 +24,9 @@
     <div class="card-body">
         <form method="get" class="row g-3">
             <div class="col-md-4">
-                <label for="status" class="form-label">Statut</label>
-                <select class="form-select" id="status" name="status">
-                    <option value="">Tous les statuts</option>
+                <label for="status" class="form-label text-uppercase" style="font-size: 11px; letter-spacing: 1px;">Filtrer par Statut</label>
+                <select class="form-select shadow-none" id="status" name="status" style="background: rgba(0,0,0,0.5);">
+                    <option value="">-- TOUS LES STATUTS --</option>
                     {% for choice in status_choices %}
                     <option value="{{ choice.0 }}" {% if status_filter == choice.0 %}selected{% endif %}>
                         {{ choice.1 }}
@@ -29,24 +35,23 @@
                 </select>
             </div>
             <div class="col-md-4">
-                <label for="alert_level" class="form-label">Niveau d'alerte</label>
-                <select class="form-select" id="alert_level" name="alert_level">
-                    <option value="">Tous les niveaux</option>
+                <label for="alert_level" class="form-label text-uppercase" style="font-size: 11px; letter-spacing: 1px;">Niveau d'Alerte</label>
+                <select class="form-select shadow-none" id="alert_level" name="alert_level" style="background: rgba(0,0,0,0.5);">
+                    <option value="">-- TOUS LES NIVEAUX --</option>
                     {% for choice in alert_level_choices %}
                     <option value="{{ choice.0 }}" {% if alert_level_filter == choice.0 %}selected{% endif %}>
-                        {{ choice.1 }}
+                        {{ choice.1|upper }}
                     </option>
                     {% endfor %}
                 </select>
             </div>
-            <div class="col-md-4">
-                <label class="form-label">&nbsp;</label>
-                <div class="d-flex gap-2">
-                    <button type="submit" class="btn btn-primary">
-                        <i class="fas fa-filter"></i> Filtrer
+            <div class="col-md-4 d-flex align-items-end">
+                <div class="d-flex gap-2 w-100">
+                    <button type="submit" class="btn btn-primary flex-grow-1" style="box-shadow: 0 0 15px rgba(0,255,136,0.2);">
+                        <i class="fas fa-filter"></i> APPLIQUER
                     </button>
-                    <a href="{% url 'detections_list' %}" class="btn btn-outline-secondary">
-                        <i class="fas fa-times"></i> Réinitialiser
+                    <a href="{% url 'detections_list' %}" class="btn btn-outline-secondary" title="Réinitialiser">
+                        <i class="fas fa-sync-alt"></i>
                     </a>
                 </div>
             </div>
@@ -57,13 +62,15 @@
 <!-- Statistiques des filtres -->
 <div class="row mb-4">
     <div class="col-12">
-        <div class="alert alert-info">
-            <i class="fas fa-info-circle"></i>
-            <strong>{{ detections.count }}</strong> détection{{ detections.count|pluralize }} trouvée{{
-            detections.count|pluralize }}
-            {% if status_filter or alert_level_filter %}
-            avec les filtres appliqués
-            {% endif %}
+        <div class="alert alert-info d-flex align-items-center" style="background: rgba(13, 202, 240, 0.1); border-color: rgba(13, 202, 240, 0.3);">
+            <i class="fas fa-satellite me-3 fa-2x"></i>
+            <div>
+                <span style="font-size: 18px; font-weight: bold; color: var(--neon-blue);">{{ detections.count }}</span>
+                <span class="text-uppercase" style="letter-spacing: 1px;"> cible(s) dÉtectÉe(s)</span>
+                {% if status_filter or alert_level_filter %}
+                <span style="color: rgba(255,255,255,0.6);"> (filtres actifs)</span>
+                {% endif %}
+            </div>
         </div>
     </div>
 </div>
@@ -79,81 +86,78 @@
     <div class="card-body p-0">
         {% if detections %}
         <div class="table-responsive">
-            <table class="table table-hover mb-0">
-                <thead class="table-light">
-                    <tr>
-                        <th>ID</th>
-                        <th>Date</th>
-                        <th>Statut</th>
-                        <th>Alerte</th>
-                        <th>Zone Cadastrale</th>
-                        <th>NDBI T1→T2</th>
-                        <th>Surface</th>
-                        <th>Confiance</th>
-                        <th>Actions</th>
+            <table class="table table-hover mb-0 align-middle" style="background: transparent;">
+                <thead style="background: rgba(0,0,0,0.5);">
+                    <tr style="text-transform: uppercase; font-size: 11px; letter-spacing: 1px; color: rgba(255,255,255,0.6);">
+                        <th class="py-3 px-4 border-0">ID</th>
+                        <th class="py-3 px-4 border-0">Date</th>
+                        <th class="py-3 px-4 border-0">Statut</th>
+                        <th class="py-3 px-4 border-0">Alerte</th>
+                        <th class="py-3 px-4 border-0">Zone Cadastrale</th>
+                        <th class="py-3 px-4 border-0">Surface</th>
+                        <th class="py-3 px-4 border-0" style="width: 150px;">IA Confiance</th>
+                        <th class="py-3 px-4 border-0 text-end">Action</th>
                     </tr>
                 </thead>
                 <tbody>
                     {% for detection in detections %}
-                    <tr class="alert-{{ detection.alert_level }}">
-                        <td>
-                            <strong>#{{ detection.id }}</strong>
+                    <tr style="transition: all 0.2s; border-bottom: 1px solid rgba(255,255,255,0.05);" onmouseover="this.style.background='rgba(255,255,255,0.05)'" onmouseout="this.style.background='transparent'">
+                        <td class="px-4">
+                            <strong style="color: var(--neon-green);">#{{ detection.id }}</strong>
                         </td>
-                        <td>
-                            <small>{{ detection.date_detection|date:"d/m/Y H:i" }}</small>
+                        <td class="px-4">
+                            <i class="far fa-clock" style="color: rgba(255,255,255,0.4);"></i> {{ detection.date_detection|date:"d/m/Y H:i" }}
                         </td>
-                        <td>
-                            <span class="badge bg-secondary">
-                                {{ detection.get_status_display }}
-                            </span>
-                        </td>
-                        <td>
-                            <span
-                                class="badge {% if detection.alert_level == 'rouge' %}bg-danger{% elif detection.alert_level == 'orange' %}bg-warning{% elif detection.alert_level == 'vert' %}bg-success{% else %}bg-info{% endif %}">
-                                {{ detection.alert_level|title }}
-                            </span>
-                        </td>
-                        <td>
-                            {% if detection.zone_cadastrale %}
-                            <div>
-                                <strong>{{ detection.zone_cadastrale.zone_id }}</strong><br>
-                                <small class="text-muted">{{ detection.zone_cadastrale.name|truncatechars:30 }}</small>
-                            </div>
+                        <td class="px-4">
+                            {% if detection.status == 'infraction_zonage' %}
+                                <span class="badge border border-danger text-danger bg-transparent px-2 py-1"><i class="fas fa-times-circle"></i> {{ detection.get_status_display }}</span>
+                            {% elif detection.status == 'sous_condition' %}
+                                <span class="badge border border-warning text-warning bg-transparent px-2 py-1"><i class="fas fa-exclamation-circle"></i> {{ detection.get_status_display }}</span>
+                            {% elif detection.status == 'conforme' %}
+                                <span class="badge border border-success text-success bg-transparent px-2 py-1"><i class="fas fa-check-circle"></i> {{ detection.get_status_display }}</span>
                             {% else %}
-                            <span class="text-muted">Hors cadastre</span>
+                                <span class="badge border border-info text-info bg-transparent px-2 py-1"><i class="fas fa-shield-alt"></i> {{ detection.get_status_display }}</span>
                             {% endif %}
                         </td>
-                        <td>
-                            <code class="small">
-                                {{ detection.ndbi_t1|floatformat:2 }} → {{ detection.ndbi_t2|floatformat:2 }}
-                            </code>
+                        <td class="px-4">
+                            <span class="badge {% if detection.alert_level == 'rouge' %}bg-danger{% elif detection.alert_level == 'orange' %}bg-warning text-dark{% elif detection.alert_level == 'vert' %}bg-success text-dark{% else %}bg-info text-dark{% endif %} px-2 py-1 shadow-sm">
+                                {{ detection.alert_level|upper }}
+                            </span>
                         </td>
-                        <td>
+                        <td class="px-4">
+                            {% if detection.zone_cadastrale %}
+                            <div class="d-flex align-items-center">
+                                <i class="fas fa-map-marked-alt me-2" style="color: var(--neon-blue);"></i>
+                                <div>
+                                    <strong style="color: white;">{{ detection.zone_cadastrale.zone_id }}</strong><br>
+                                    <span style="color: rgba(255,255,255,0.5); font-size: 11px;">{{ detection.zone_cadastrale.name|truncatechars:25 }}</span>
+                                </div>
+                            </div>
+                            {% else %}
+                            <span style="color: rgba(255,255,255,0.3);"><i class="fas fa-times"></i> Hors Cadastre</span>
+                            {% endif %}
+                        </td>
+                        <td class="px-4">
                             {% if detection.surface_m2 %}
-                            {{ detection.surface_m2|floatformat:0 }} m²
+                            <span style="font-family: var(--font-main); font-weight: bold; color: var(--neon-green);">{{ detection.surface_m2|floatformat:0 }}</span> <span style="font-size: 11px; color: rgba(255,255,255,0.5);">m²</span>
                             {% else %}
                             <span class="text-muted">-</span>
                             {% endif %}
                         </td>
-                        <td>
-                            <div class="progress" style="height: 20px;">
+                        <td class="px-4">
+                            <div class="progress" style="height: 6px; background: rgba(255,255,255,0.1); border-radius: 3px; overflow: hidden; margin-bottom: 4px;">
                                 <div class="progress-bar {% if detection.confidence > 0.7 %}bg-success{% elif detection.confidence > 0.5 %}bg-warning{% else %}bg-danger{% endif %}"
                                     data-width="{% widthratio detection.confidence 1 100 %}">
-                                    {% widthratio detection.confidence 1 100 %}%
                                 </div>
                             </div>
-                        </td>
-                        <td>
-                            <div class="btn-group btn-group-sm">
-                                <a href="{% url 'detection_detail' detection.id %}" class="btn btn-outline-primary">
-                                    <i class="fas fa-eye"></i>
-                                </a>
-                                {% if detection.verification_required %}
-                                <button class="btn btn-outline-warning" title="Nécessite une vérification">
-                                    <i class="fas fa-exclamation-triangle"></i>
-                                </button>
-                                {% endif %}
+                            <div class="text-end" style="font-size: 10px; color: rgba(255,255,255,0.7);">
+                                CONF: <span style="color: white; font-weight: bold;">{% widthratio detection.confidence 1 100 %}%</span>
                             </div>
+                        </td>
+                        <td class="px-4 text-end">
+                            <a href="{% url 'detection_detail' detection.id %}" class="btn btn-outline-primary btn-sm py-1 px-3" style="border-radius: 20px;">
+                                <i class="fas fa-crosshairs me-1"></i> ANALYSER
+                            </a>
                         </td>
                     </tr>
                     {% endfor %}
@@ -162,18 +166,20 @@
         </div>
         {% else %}
         <div class="text-center py-5">
-            <i class="fas fa-search fa-3x text-muted mb-3"></i>
-            <h5 class="text-muted">Aucune détection trouvée</h5>
-            <p class="text-muted">
+            <div style="font-size: 60px; color: rgba(255,255,255,0.1); margin-bottom: 20px;">
+                <i class="fas fa-radar"></i>
+            </div>
+            <h5 style="color: var(--neon-green); text-transform: uppercase;">Alerte : Aucune Détection</h5>
+            <p style="color: rgba(255,255,255,0.6);">
                 {% if status_filter or alert_level_filter %}
-                Essayez de modifier les filtres pour voir plus de résultats.
+                Vos filtres de recherche ne correspondent à aucune activité sur le terrain.
                 {% else %}
-                Aucune détection n'a été enregistrée pour le moment.
+                Le système IA n'a détecté aucune anomalie récente.
                 {% endif %}
             </p>
             {% if status_filter or alert_level_filter %}
-            <a href="{% url 'detections_list' %}" class="btn btn-primary">
-                <i class="fas fa-times"></i> Effacer les filtres
+            <a href="{% url 'detections_list' %}" class="btn btn-outline-primary mt-3">
+                <i class="fas fa-sync"></i> RÉINITIALISER LE RADAR
             </a>
             {% endif %}
         </div>

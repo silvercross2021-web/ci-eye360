@@ -1,0 +1,100 @@
+civ_eye/
+│
+├── config/                        ← Configuration Django centrale
+│   ├── settings/
+│   │   ├── base.py
+│   │   ├── dev.py
+│   │   └── prod.py
+│   ├── urls.py                    ← URLs centrales (inclut les 3 modules)
+│   ├── celery.py
+│   └── wsgi.py
+│
+├── core/                          ★ MOTEUR PARTAGÉ — personne ne touche sans accord
+│   ├── models.py                  ← Modèles de base (Zone, Analyse, Alerte)
+│   ├── change_detection.py        ← Algorithme IA unique paramétrable
+│   ├── satellite/
+│   │   ├── acquisition.py         ← Téléchargement Sentinel-2 (STAC API)
+│   │   ├── preprocessing.py       ← Masque nuages SCL, reprojection, normalisation
+│   │   └── indices.py             ← NDVI, NDBI, NBR2, MNDWI, BSI
+│   ├── services/
+│   │   ├── pdf_generator.py       ← Génération PDF WeasyPrint (partagé)
+│   │   ├── notifications.py       ← Email + SMS Twilio (partagé)
+│   │   └── geojson_utils.py       ← Fonctions GeoPandas communes
+│   └── tests/
+│
+├── module1_urbanisme/             ★ TON MODULE — toi seul touches ici
+│   ├── models.py
+│   ├── views.py
+│   ├── urls.py
+│   ├── serializers.py
+│   ├── tasks.py                   ← Tâche Celery : lancer_analyse_urbanisme
+│   ├── pipeline/
+│   │   ├── change_detection_urban.py
+│   │   ├── cadastre_crossing.py   ← Les 4 cas logiques
+│   │   └── scoring.py
+│   └── tests/
+│
+├── module2_agroecologie/          ★ MODULE AMI 2 — il touche seulement ici
+│   ├── models.py
+│   ├── views.py
+│   ├── urls.py
+│   ├── serializers.py
+│   ├── tasks.py
+│   ├── pipeline/
+│   │   ├── ndvi_analysis.py
+│   │   ├── meteo_crossing.py
+│   │   └── deforestation_scoring.py
+│   └── tests/
+│
+├── module3_orpaillage/            ★ MODULE AMI 3 — il touche seulement ici
+│   ├── models.py
+│   ├── views.py
+│   ├── urls.py
+│   ├── serializers.py
+│   ├── tasks.py
+│   ├── pipeline/
+│   │   ├── heuristics.py
+│   │   ├── water_turbidity.py
+│   │   └── galamsey_scoring.py
+│   └── tests/
+│
+├── dashboard/                     ← Frontend unifié (carte Leaflet + navbar)
+│   ├── views.py
+│   ├── urls.py
+│   └── templates/
+│       └── dashboard/
+│           ├── base.html          ← Template de base + Leaflet
+│           ├── home.html
+│           └── map.html
+│
+├── templates/                     ← Templates HTML globaux
+│   ├── base.html
+│   └── components/
+│       ├── navbar.html
+│       ├── sidebar.html
+│       └── alerte_card.html
+│
+├── static/                        ← CSS, JS, images globaux
+│   ├── css/
+│   │   └── main.css
+│   ├── js/
+│   │   ├── map.js                 ← Leaflet partagé
+│   │   └── charts.js              ← Chart.js partagé
+│   └── img/
+│
+├── data/                          ← Données GeoJSON de référence
+│   ├── cadastre_mock.geojson      ← Module 1
+│   ├── zones_risque.geojson       ← Module 1
+│   ├── ms_footprints_abidjan.geojson
+│   ├── regions_agricoles.geojson  ← Module 2
+│   └── zones_minieres.geojson     ← Module 3
+│
+├── media/                         ← Fichiers générés (images, PDFs)
+│   └── satellite/
+│       ├── raw/
+│       └── processed/
+│
+├── manage.py
+├── requirements.txt
+├── docker-compose.yml
+└── .env.example
