@@ -1,0 +1,89 @@
+{
+  "timestamp": "2026-03-25T17:58:13.498136",
+  "date_t1": "2024-02-15",
+  "date_t2": "2025-01-15",
+  "mode": "verify_only",
+  "volet1": {
+    "go": true,
+    "checks": {
+      "django_check": true,
+      "image_satellite": true,
+      "image_t1": {
+        "id": 11,
+        "date": "2024-02-15",
+        "bands": {
+          "B04": "C:\\Users\\silve\\Desktop\\SIADE_hackathon\\module1_urbanisme\\data_use\\sentinel_api_exports\\2024-02-15\\B04_2024-02-15.tif",
+          "B08": "C:\\Users\\silve\\Desktop\\SIADE_hackathon\\module1_urbanisme\\data_use\\sentinel_api_exports\\2024-02-15\\B08_2024-02-15.tif",
+          "B11": "C:\\Users\\silve\\Desktop\\SIADE_hackathon\\module1_urbanisme\\data_use\\sentinel_api_exports\\2024-02-15\\B11_2024-02-15.tif"
+        },
+        "scl": "C:\\Users\\silve\\Desktop\\SIADE_hackathon\\module1_urbanisme\\data_use\\sentinel_api_exports\\2024-02-15\\SCL_2024-02-15.tif"
+      },
+      "image_t2": {
+        "id": 12,
+        "date": "2025-01-15",
+        "bands": {
+          "B04": "C:\\Users\\silve\\Desktop\\SIADE_hackathon\\module1_urbanisme\\data_use\\sentinel_api_exports\\2025-01-15\\B04_2025-01-15.tif",
+          "B08": "C:\\Users\\silve\\Desktop\\SIADE_hackathon\\module1_urbanisme\\data_use\\sentinel_api_exports\\2025-01-15\\B08_2025-01-15.tif",
+          "B11": "C:\\Users\\silve\\Desktop\\SIADE_hackathon\\module1_urbanisme\\data_use\\sentinel_api_exports\\2025-01-15\\B11_2025-01-15.tif"
+        },
+        "scl": "C:\\Users\\silve\\Desktop\\SIADE_hackathon\\module1_urbanisme\\data_use\\sentinel_api_exports\\2025-01-15\\SCL_2025-01-15.tif"
+      },
+      "tif_files": true,
+      "tif_details": {
+        "2024-02-15": {
+          "found": [
+            "B04",
+            "B08",
+            "B11",
+            "SCL"
+          ],
+          "missing": []
+        },
+        "2025-01-15": {
+          "found": [
+            "B04",
+            "B08",
+            "B11",
+            "SCL"
+          ],
+          "missing": []
+        }
+      },
+      "footprints": true,
+      "footprint_count": {
+        "v3": 39810,
+        "total": 39810
+      },
+      "cadastre": true,
+      "cadastre_count": 19,
+      "tinycd_weights": true,
+      "gee": true,
+      "detections_existing": 729,
+      "detections_by_status": [
+        {
+          "status": "sous_condition",
+          "alert_level": "orange",
+          "count": 76
+        },
+        {
+          "status": "infraction_zonage",
+          "alert_level": "rouge",
+          "count": 38
+        },
+        {
+          "status": "surveillance_preventive",
+          "alert_level": "veille",
+          "count": 590
+        },
+        {
+          "status": "conforme",
+          "alert_level": "vert",
+          "count": 25
+        }
+      ]
+    },
+    "errors": [],
+    "warnings": []
+  },
+  "volet2": {}
+}
