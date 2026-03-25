@@ -26,8 +26,8 @@ urlpatterns = [
     path("", include('module1_urbanisme.urls_web')),
     # API Module 1 Urbanisme (originale)
     path("", include('module1_urbanisme.urls')),
-    # API simplifiée pour tests
-    path("", include('module1_urbanisme.urls_simple')),
+    # API simplifiée pour tests (préfixe distinct pour éviter ambiguïté)
+    path("api/v2/", include('module1_urbanisme.urls_simple')),
     # Documentation API (désactivée temporairement)
     # path("docs/", include_docs_urls(title="CIV-Eye Module 1 API")),
 ]

@@ -81,6 +81,7 @@ class APIHealthChecker:
                 return
 
             total_files = 0
+            corrupt_files = []
             for date_dir in sorted(date_dirs):
                 dir_path = os.path.join(sentinel_dir, date_dir)
                 # Chercher .tif (3 lettres) ET .tiff (4 lettres)
@@ -90,7 +91,21 @@ class APIHealthChecker:
                 logger.info(f"  {ICON_OK} {date_dir} — Bandes: {', '.join(bands_found)} | {scl_ok}")
                 total_files += len(tif_files)
 
-            self._log(ICON_OK, label, f"{total_files} fichiers TIF — {len(date_dirs)} dates (T1 + T2). Pipeline local fonctionnel.")
+                # Test d'intégrité : vérifier que le premier TIFF s'ouvre sans erreur
+                if tif_files:
+                    try:
+                        import rasterio
+                        first_tif = os.path.join(dir_path, tif_files[0])
+                        with rasterio.open(first_tif) as src:
+                            _ = src.shape  # force la lecture du header
+                    except Exception as e:
+                        corrupt_files.append(f"{date_dir}/{tif_files[0]}: {e}")
+
+            if corrupt_files:
+                self._log(ICON_WARN, label, f"Fichiers TIFF corrompus : {corrupt_files}")
+                self.results["local_tiff"] = True  # pipeline peut continuer mais warning
+            else:
+                self._log(ICON_OK, label, f"{total_files} fichiers TIF — {len(date_dirs)} dates (T1 + T2). Pipeline local fonctionnel.")
             self.results["local_tiff"] = True
 
         except Exception as e:

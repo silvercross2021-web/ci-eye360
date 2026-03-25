@@ -20,6 +20,8 @@ THRESHOLD_VV = 0.15
 
 def evaluate_sar_backscatter_delta(vv_t1: np.ndarray, vv_t2: np.ndarray, vh_t1: np.ndarray, vh_t2: np.ndarray) -> np.ndarray:
     
+    # Calcul de la différence de rétrodiffusion VV entre T2 et T1
+    delta_vv = vv_t2 - vv_t1
     # Masque binaire
     sar_mask = (delta_vv > THRESHOLD_VV).astype(np.uint8)
     

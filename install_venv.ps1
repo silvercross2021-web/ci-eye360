@@ -12,5 +12,8 @@ Write-Host "3. Installation des API pour la Phase 3 & 4 dans le VENV..."
 # Les libs existantes (Django, GDAL, Numpy) sont déjà héritées !
 .\venv\Scripts\python.exe -m pip install sentinelhub planetary-computer pystac-client earthengine-api oauthlib requests-oauthlib
 
+Write-Host "4. Installation du requirements.txt complet (dépendances restantes)..."
+.\venv\Scripts\python.exe -m pip install -r requirements.txt
+
 Write-Host "`n=== SUCCES : VENV COMPLET CREE ==="
 Write-Host "Pour l'utiliser, tape : .\venv\Scripts\activate"

@@ -178,7 +178,7 @@ class Command(BaseCommand):
         geometry = feature.get("geometry")
         return {
             "geometry": GEOSGeometry(json.dumps(geometry)),
-            "source": "Google_Open_Buildings_V3",  # BUG-005 : Préciser la source réelle
+            "source": "Google_V3_2023",
             "source_file": "Abidjan_33333010.geojsonl",
             "date_reference": "~2023-2024",
         }

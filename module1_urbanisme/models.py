@@ -1,5 +1,8 @@
+import logging
 from django.contrib.gis.db import models
 from django.contrib.auth.models import User
+
+logger = logging.getLogger(__name__)
 
 
 class ZoneCadastrale(models.Model):
@@ -63,7 +66,6 @@ class MicrosoftFootprint(models.Model):
     SOURCE_CHOICES = [
         ('Google_V3_2023', 'Google Open Buildings V3 (mai 2023)'),
         ('Google_Temporal_V1', 'Google Open Buildings Temporal V1'),
-        ('Microsoft_2020', 'Microsoft Building Footprints (obsolète)'),
     ]
     
     # GÉOMÉTRIE POSTGIS NATIVE
@@ -179,8 +181,8 @@ class DetectionConstruction(models.Model):
             centroid = self.geometry.centroid
             # GeoDjango Point: x=longitude, y=latitude
             return {"latitude": round(centroid.y, 6), "longitude": round(centroid.x, 6)}
-        except Exception:
-            pass
+        except Exception as e:
+            logger.warning(f"get_centroid_coordinates() failed for detection id={self.pk}: {e}")
             
         return {"latitude": None, "longitude": None}
 

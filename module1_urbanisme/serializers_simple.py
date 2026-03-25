@@ -4,6 +4,7 @@ Serializers simplifiés pour éviter les erreurs de sérialisation
 
 from rest_framework import serializers
 from .models import ZoneCadastrale, DetectionConstruction
+from .serializers import compute_priority_score
 
 
 class ZoneCadastraleSimpleSerializer(serializers.ModelSerializer):
@@ -34,29 +35,7 @@ class DetectionConstructionSimpleSerializer(serializers.ModelSerializer):
         ]
     
     def get_priority_score(self, obj):
-        """Calcule le score de priorité 0-100"""
-        score = 0
-        
-        if obj.status == 'infraction_zonage':
-            score += 80
-        elif obj.status == 'sous_condition':
-            score += 45
-        elif obj.status == 'surveillance_preventive':
-            score += 20
-        
-        # Intensité du changement NDBI
-        if obj.ndbi_t1 is not None and obj.ndbi_t2 is not None:
-            delta_ndbi = obj.ndbi_t2 - obj.ndbi_t1
-            if delta_ndbi > 0.4:
-                score += 15
-            elif delta_ndbi > 0.25:
-                score += 8
-        
-        # Surface impactée
-        if obj.surface_m2 and obj.surface_m2 > 500:
-            score += 5
-        
-        return min(score, 100)
+        return compute_priority_score(obj)
     
     def get_alert_label(self, obj):
         """Retourne le label avec emoji pour l'affichage"""

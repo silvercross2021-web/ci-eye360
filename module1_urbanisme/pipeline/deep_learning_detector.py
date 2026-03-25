@@ -23,6 +23,11 @@ import numpy as np
 
 logger = logging.getLogger(__name__)
 
+# B33 — Seuil de détection TinyCD.
+# Abaissé à 0.30 (vs 0.50 original LEVIR-CD) pour contexte africain Sentinel-2 10m/px.
+# ⚠️ Non validé sur vérité terrain ivoirienne — calibrer avec données GPS Treichville.
+TINYCD_CHANGE_THRESHOLD = 0.30
+
 class DeepLearningDetector:
     def __init__(self, model_version="tinycd"):
         self.model_version = model_version
@@ -63,16 +68,17 @@ class DeepLearningDetector:
                 freeze_backbone=False
             ).to(self.device)
             # Charger et adapter les poids (différence de nommage dans les couches mixing)
-            state_dict = torch.load(self.weights_path, map_location=self.device)
-            # B32 : Mapping fragile — si les poids changent de version, vérifier
-            # que les clés du state_dict correspondent. Le mapping ci-dessous compense
-            # une différence de nommage entre le modèle original et notre architecture.
-            # Après téléchargement de nouveaux poids, valider avec strict=True d'abord.
+            # B32 CORRIGÉ : weights_only=True évite l'exécution de code arbitraire via pickle
+            state_dict = torch.load(self.weights_path, map_location=self.device, weights_only=True)
             adapted_dict = {}
+            remapped = 0
             for k, v in state_dict.items():
                 new_k = k.replace('_mixing._convmix', '_convmix')
+                if new_k != k:
+                    remapped += 1
                 adapted_dict[new_k] = v
-                
+            if remapped:
+                logger.info(f"B32 : {remapped} clé(s) remappée(s) (_mixing._convmix → _convmix)")
             self.model.load_state_dict(adapted_dict, strict=False)
             self.model.eval()  # Mode inférence (désactive le Dropout/BatchNorm)
             logger.info("✅ Architecture Deep Learning (TinyCD) chargée avec succès et poids adaptés !")
@@ -146,10 +152,7 @@ class DeepLearningDetector:
             with torch.no_grad():
                 output = self.model(tensor_t1, tensor_t2)
                 # La sortie est de shape (1, 1, H_pad, W_pad)
-                # B33 : Seuil abaissé de 0.50 à 0.30 pour contexte africain.
-                # ⚠️ NON VALIDÉ sur vérité terrain — à calibrer avec des données GPS
-                # de constructions connues à Treichville avant usage en production.
-                pred_mask = (output > 0.30).squeeze().cpu().numpy().astype(np.uint8)
+                pred_mask = (output > TINYCD_CHANGE_THRESHOLD).squeeze().cpu().numpy().astype(np.uint8)
             
             # ── On supprime le padding pour revenir à la shape originale (H, W)
             if pad_h > 0 or pad_w > 0:

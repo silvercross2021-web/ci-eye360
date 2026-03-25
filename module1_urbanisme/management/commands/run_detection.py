@@ -22,7 +22,7 @@ import numpy as np
 import rasterio
 import rasterio.transform as rtransform
 
-from django.core.management.base import BaseCommand
+from django.core.management.base import BaseCommand, CommandError
 from django.db import transaction, models
 from django.utils import timezone
 
@@ -118,13 +118,6 @@ class Command(BaseCommand):
                 "Ajoutez --download-b03 ou les résultats seront dégradés (fallback B04/B08/B11)."
             ))
 
-        # ══ TÉLÉCHARGEMENT B03 VIA CDSE SI DEMANDÉ ════════════════
-        if download_b03:
-            from module1_urbanisme.pipeline.b03_downloader import download_b03_cdse
-            self.stdout.write("📡 Téléchargement B03 automatique (NDWI/masque eau)...")
-            download_b03_cdse(date_t1, str(datetime.strptime(date_t1, "%Y-%m-%d") + timedelta(days=90)))
-            download_b03_cdse(date_t2, str(datetime.strptime(date_t2, "%Y-%m-%d") + timedelta(days=90)))
-
         self.stdout.write("🚀 LANCEMENT PIPELINE DE DÉTECTION CIV-EYE MODULE 1")
         self.stdout.write(f"📅 Période    : {date_t1 or 'auto'} → {date_t2 or 'auto'}")
         
@@ -142,6 +135,28 @@ class Command(BaseCommand):
         try:
             # ── Étape 1 : Récupération des images ────────────────────
             image_t1, image_t2 = self.get_sentinel_images(date_t1, date_t2)
+
+            # ══ TÉLÉCHARGEMENT B03 VIA CDSE SI DEMANDÉ ══════════════════════
+            if download_b03:
+                from module1_urbanisme.pipeline.b03_downloader import download_b03_cdse
+                from module1_urbanisme.pipeline.b03_synthesizer import synthesize_b03
+                self.stdout.write("📡 Téléchargement B03 automatique (NDWI/masque eau)...")
+                d1 = str(image_t1.date_acquisition)
+                d2 = str(image_t2.date_acquisition)
+                for date_str, img in [(d1, image_t1), (d2, image_t2)]:
+                    date_to = (datetime.strptime(date_str, "%Y-%m-%d") + timedelta(days=90)).strftime("%Y-%m-%d")
+                    b03_path = download_b03_cdse(date_str, date_to)
+                    if b03_path:
+                        self.stdout.write(f"   ✅ B03 réel ({date_str}) : {b03_path}")
+                    else:
+                        # Fallback synthèse B03 = 0.75×B04 + 0.25×B08 (Delegido 2011)
+                        b03_synth = synthesize_b03(img.bands["B04"], img.bands["B08"])
+                        if b03_synth:
+                            self.stdout.write(f"   🔧 B03 synthétisé ({date_str}) : {b03_synth}")
+                        else:
+                            self.stdout.write(self.style.WARNING(
+                                f"   ⚠️  B03 indisponible ({date_str}) — masque eau proxy activé"
+                            ))
 
             # M13 : Suppression des détections précédentes pour cette paire T1/T2
             if clear_previous and not dry_run:
@@ -192,6 +207,14 @@ class Command(BaseCommand):
                 import numpy as np
                 import rasterio
                 dl_detector = DeepLearningDetector()
+                # P9 CORRIGÉ : erreur explicite si poids absents (au lieu de silence)
+                if not dl_detector.is_ready:
+                    raise CommandError(
+                        "❌ [TinyCD] model_weights.pth introuvable dans data_use/weights/\n"
+                        "   Télécharger levir_best.pth depuis :\n"
+                        "   https://github.com/AndreaCodegoni/Tiny_model_4_CD/tree/main/pretrained_models\n"
+                        "   → Renommer en 'model_weights.pth' dans module1_urbanisme/data_use/weights/"
+                    )
                 
                 # ── B1 CORRIGÉ : TinyCD avec vraies bandes RGB si B03 disponible ──
                 # TinyCD a été entraîné sur B04(R)/B03(G)/B02(B), pas sur IRR.

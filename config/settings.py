@@ -12,6 +12,7 @@ https://docs.djangoproject.com/en/5.2/ref/settings/
 
 from pathlib import Path
 import os
+import sys
 import warnings
 
 # ═══════════════════════════════════════════════════════════════════
@@ -50,7 +51,7 @@ BASE_DIR = Path(__file__).resolve().parent.parent
 # See https://docs.djangoproject.com/en/5.2/howto/deployment/checklist/
 
 # SECURITY WARNING: keep the secret key used in production secret!
-SECRET_KEY = env('SECRET_KEY', default='django-insecure-td9(5+%t=g3x=^u1lp#g2_7uq$*58r$o_srkwrp9^e1^*m$v0!')
+SECRET_KEY = env('SECRET_KEY')
 
 # SECURITY WARNING: don't run with debug turned on in production!
 DEBUG = env.bool('DEBUG', default=False)
@@ -69,6 +70,8 @@ INSTALLED_APPS = [
     "django.contrib.sessions",
     "django.contrib.messages",
     "django.contrib.staticfiles",
+    # Application fondation commune
+    "core",
     # Module 1 Urbanisme
     "module1_urbanisme",
     # Django REST Framework
@@ -113,12 +116,15 @@ DATABASES = {
 }
 
 if DATABASES['default']['ENGINE'] == 'django.contrib.gis.db.backends.postgis':
-    # Configuration spatiale Windows (PostgreSQL 16)
-    POSTGRES_BIN = r"C:\Program Files\PostgreSQL\16\bin"
-    GDAL_LIBRARY_PATH = os.path.join(POSTGRES_BIN, 'libgdal-34.dll')
-    GEOS_LIBRARY_PATH = os.path.join(POSTGRES_BIN, 'libgeos_c.dll')
-    # On ajoute au PATH Windows pour que les DLLs dépendantes soient trouvées
-    os.environ['PATH'] = POSTGRES_BIN + os.pathsep + os.environ.get('PATH', '')
+    if sys.platform == 'win32':
+        # P3 CORRIGÉ : DLL Windows uniquement — Linux/Mac ignorent ce bloc
+        # C4 : Chemin configurable via variable d'environnement POSTGRES_BIN_PATH
+        _default_pg_bin = r"C:\Program Files\PostgreSQL\16\bin"
+        POSTGRES_BIN = env('POSTGRES_BIN_PATH', default=_default_pg_bin)
+        GDAL_LIBRARY_PATH = os.path.join(POSTGRES_BIN, 'libgdal-34.dll')
+        GEOS_LIBRARY_PATH = os.path.join(POSTGRES_BIN, 'libgeos_c.dll')
+        # On ajoute au PATH Windows pour que les DLLs dépendantes soient trouvées
+        os.environ['PATH'] = POSTGRES_BIN + os.pathsep + os.environ.get('PATH', '')
 
 
 # Password validation
@@ -142,10 +148,6 @@ AUTH_PASSWORD_VALIDATORS = [
 
 # Internationalization
 # https://docs.djangoproject.com/en/5.2/topics/i18n/
-
-LANGUAGE_CODE = "en-us"
-
-TIME_ZONE = "UTC"
 
 USE_I18N = True
 

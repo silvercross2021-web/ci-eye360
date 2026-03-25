@@ -305,11 +305,10 @@ class SentinelDataFetcher:
         ]
 
         search = catalog.search(
-            collections=["SENTINEL-2"],
+            collections=["sentinel-2-l2a"],
             bbox=bbox_list,
             datetime=f"{time_from}/{time_to}",
-            query={"eo:cloud_cover": {"lte": max_cloud_cover}},
-            max_items=5,
+            max_items=10,
         )
 
         items = list(search.items())
@@ -438,17 +437,29 @@ class SentinelDataFetcher:
     # ─────────────────────────────────────────────────────────────────────
     def get_t1_and_t2_bands(
         self,
-        date_t1: str = "2024-01-29",
-        date_t2: str = "2025-01-13",
+        date_t1: str,
+        date_t2: str,
         bands: List[str] = None,
         max_cloud_cover: float = 15.0,
     ) -> tuple:
         """
         Récupère les bandes de T1 et T2 prêtes pour le pipeline NDBI.
 
+        Args:
+            date_t1: Date T1 au format 'YYYY-MM-DD' (obligatoire)
+            date_t2: Date T2 au format 'YYYY-MM-DD' (obligatoire)
+
         Returns:
             Tuple (bands_t1_dict, bands_t2_dict) chacun étant un dict {band: np.ndarray}
+
+        Raises:
+            ValueError: si date_t1 ou date_t2 est absent ou vide
         """
+        if not date_t1 or not date_t2:
+            raise ValueError(
+                "get_t1_and_t2_bands : date_t1 et date_t2 sont obligatoires. "
+                "Exemple : fetcher.get_t1_and_t2_bands('2024-02-15', '2025-01-15')"
+            )
         if bands is None:
             bands = ["B04", "B08", "B11", "SCL"]
 

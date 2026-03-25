@@ -145,21 +145,20 @@ class GEECompositor:
                 # Obtenir les dimensions de la région
                 scale = 10 if band_name in ["B04", "B08"] else 20
 
-                # Exporter comme array numpy via getPixels (API EE)
+                # Exporter comme GeoTIFF via getDownloadURL (format supporté par l'API GEE)
                 pixels = band_image.getDownloadURL({
                     "scale": scale,
                     "crs": "EPSG:4326",
                     "region": region,
-                    "format": "NPY", # Note: Ce format est supporté par getDownloadURL
+                    "format": "GEO_TIFF",
                 })
 
                 response = requests.get(pixels)
-                arr = np.load(
-                    __import__("io").BytesIO(response.content),
-                    allow_pickle=True,
-                )
+                import io, rasterio
+                with rasterio.open(io.BytesIO(response.content)) as src:
+                    arr = src.read(1).astype(np.float32)
                 # Normaliser DN → réflectance
-                arr = arr.astype(np.float32) / 10000.0
+                arr = arr / 10000.0
                 arr = np.clip(arr, 0.0, 1.0)
                 result[band_name] = arr
                 logger.info(f"GEE : bande {band_name} extraite — shape={arr.shape}")

@@ -90,22 +90,27 @@ class NDBICalculator:
     # ─────────────────────────────────────────────────────────────────────
     # CALCUL BSI — CORRECTIF A4
     # ─────────────────────────────────────────────────────────────────────
-    def calculate_bsi(self, b04_path: str, b08_path: str, b11_path: str) -> np.ndarray:
+    def calculate_bsi(
+        self,
+        b04_path: str,
+        b08_path: str,
+        b11_path: str,
+        b02_path: str = None,
+    ) -> np.ndarray:
         """
-        Calcule l'indice BSI simplifié (Bare Soil Index) pour détecter les terrassements.
+        Calcule le BSI (Bare Soil Index) pour détecter les terrassements.
 
-        Formule conforme au plan v2.0 :
+        Formule complète (si b02_path fourni) — Zha et al. 2003 :
+            BSI = ((B11 + B04) - (B08 + B02)) / ((B11 + B04) + (B08 + B02))
+
+        Formule simplifiée (fallback sans B02) :
             BSI_approx = (B11 - B08) / (B11 + B08)
 
-        CORRECTIF A4 : utilise B08 (NIR) en dénominateur et non B04 (Red).
-        La signature conserve b04_path pour compatibilité API mais il n'est pas utilisé
-        dans cette variante simplifiée. Il sera utile si B02 devient disponible pour
-        implémenter la formule BSI complète : ((B11+B04)-(B08+B02))/((B11+B04)+(B08+B02)).
-
         Args:
-            b04_path: Chemin vers B04 (Red) — conservé pour compatibilité
-            b08_path: Chemin vers B08 (NIR)
-            b11_path: Chemin vers B11 (SWIR1)
+            b04_path: Chemin vers B04 (Red, 10m)
+            b08_path: Chemin vers B08 (NIR, 10m)
+            b11_path: Chemin vers B11 (SWIR1, 20m)
+            b02_path: Chemin vers B02 (Blue, 10m) — optionnel, active la formule complète
 
         Returns:
             Tableau numpy 2D, valeurs dans [-1, 1].
@@ -120,19 +125,32 @@ class NDBICalculator:
                     logger.warning("BSI : rééchantillonnage B11 → B08...")
                     swir_data = self._resample_to_match(swir_src, nir_src)
 
-                # BSI_approx = (B11 - B08) / (B11 + B08)  ← CORRECTIF A4
+                if b02_path and b04_path:
+                    # Formule BSI complète : ((B11+B04)-(B08+B02)) / ((B11+B04)+(B08+B02))
+                    with rasterio.open(b04_path) as red_src, rasterio.open(b02_path) as blue_src:
+                        red_data  = red_src.read(1).astype(float)   # B04 — Red
+                        blue_data = blue_src.read(1).astype(float)  # B02 — Blue
+                        if red_data.shape != nir_data.shape:
+                            red_data = self._resample_to_match(red_src, nir_src)
+                        if blue_data.shape != nir_data.shape:
+                            blue_data = self._resample_to_match(blue_src, nir_src)
+                    num   = (swir_data + red_data) - (nir_data + blue_data)
+                    denom = (swir_data + red_data) + (nir_data + blue_data)
+                    formula_label = "BSI_complet ((B11+B04)-(B08+B02))/((B11+B04)+(B08+B02))"
+                else:
+                    # Formule simplifiée (sans B02)
+                    num   = swir_data - nir_data
+                    denom = swir_data + nir_data
+                    formula_label = "BSI_approx (B11-B08)/(B11+B08)"
+
                 with np.errstate(divide='ignore', invalid='ignore'):
-                    bsi = np.where(
-                        (swir_data + nir_data) == 0,
-                        0.0,
-                        (swir_data - nir_data) / (swir_data + nir_data),
-                    )
+                    bsi = np.where(denom == 0, 0.0, num / denom)
 
                 bsi = np.nan_to_num(bsi, nan=0.0, posinf=1.0, neginf=-1.0)
                 bsi = np.clip(bsi, -1.0, 1.0)
 
                 logger.info(
-                    f"BSI calculé (B11-B08)/(B11+B08) — Shape: {bsi.shape}, "
+                    f"BSI calculé {formula_label} — Shape: {bsi.shape}, "
                     f"Min: {bsi.min():.3f}, Max: {bsi.max():.3f}, "
                     f"Pixels sol nu (>0.15): {np.sum(bsi > 0.15):,}"
                 )

@@ -87,20 +87,24 @@ def download_b03_cdse(date_from: str, date_to: str, output_dir: Optional[str] = 
 
         # Recherche de la meilleure image avec peu de nuages
         search = catalog.search(
-            collections=["SENTINEL-2"],
+            collections=["sentinel-2-l2a"],
             bbox=TREICHVILLE_BBOX,
             datetime=f"{date_from}T00:00:00Z/{date_to}T23:59:59Z",
-            query={"eo:cloud_cover": {"lte": 30}},
-            sortby="eo:cloud_cover",
-            max_items=5,
+            max_items=20,
         )
 
         items = list(search.items())
         if not items:
             logger.warning(
-                f"⚠️  CDSE : Aucune image avec < 30% de nuages trouvée pour {date_from}→{date_to}\n"
-                f"   → Augmenter la fenêtre de dates ou le seuil de couverture nuageuse"
+                f"⚠️  CDSE : Aucune image Sentinel-2 trouvée pour {date_from}→{date_to}\n"
+                f"   → Vérifiez la connexion internet ou agrandissez la fenêtre de dates"
             )
+            return None
+
+        # Filtrer par couverture nuageuse côté Python (query STAC non supporté par CDSE)
+        items = [i for i in items if i.properties.get("eo:cloud_cover", 100) <= 80]
+        if not items:
+            logger.warning(f"⚠️  CDSE : Toutes les images ont > 80% de nuages pour {date_from}→{date_to}")
             return None
 
         # Prendre la meilleure image
@@ -128,32 +132,41 @@ def download_b03_cdse(date_from: str, date_to: str, output_dir: Optional[str] = 
             return None
 
         b03_href = best_item.assets[b03_key].href
+
+        # Convertir S3 eodata → HTTPS public CDSE (évite AccessDenied sur S3 privé)
+        if b03_href.startswith("s3://eodata/"):
+            b03_href = b03_href.replace(
+                "s3://eodata/",
+                "https://eodata.dataspace.copernicus.eu/",
+                1
+            )
         logger.info(f"📡 Téléchargement B03 depuis : {b03_href[:80]}...")
 
         # Lecture et découpage sur la zone Treichville
-        with rasterio.open(b03_href) as src:
-            window = from_bounds(
-                TREICHVILLE_BBOX[0], TREICHVILLE_BBOX[1],
-                TREICHVILLE_BBOX[2], TREICHVILLE_BBOX[3],
-                transform=src.transform
-            )
-            b03_data = src.read(1, window=window).astype(np.float32)
+        with rasterio.Env(GDAL_HTTP_UNSAFESSL='YES'):
+            with rasterio.open(b03_href) as src:
+                window = from_bounds(
+                    TREICHVILLE_BBOX[0], TREICHVILLE_BBOX[1],
+                    TREICHVILLE_BBOX[2], TREICHVILLE_BBOX[3],
+                    transform=src.transform
+                )
+                b03_data = src.read(1, window=window).astype(np.float32)
 
-            # Normaliser la réflectance DN → [0, 1]
-            b03_data = np.where(b03_data > 0, b03_data / 10000.0, 0.0)
+                # Normaliser la réflectance DN → [0, 1]
+                b03_data = np.where(b03_data > 0, b03_data / 10000.0, 0.0)
 
-            # Métadonnées pour le TIFF de sortie
-            transform = src.window_transform(window)
-            profile = src.profile.copy()
-            profile.update({
-                "driver": "GTiff",
-                "dtype": "float32",
-                "width": b03_data.shape[1],
-                "height": b03_data.shape[0],
-                "count": 1,
-                "transform": transform,
-                "crs": src.crs,
-            })
+                # Métadonnées pour le TIFF de sortie
+                transform = src.window_transform(window)
+                profile = src.profile.copy()
+                profile.update({
+                    "driver": "GTiff",
+                    "dtype": "float32",
+                    "width": b03_data.shape[1],
+                    "height": b03_data.shape[0],
+                    "count": 1,
+                    "transform": transform,
+                    "crs": src.crs,
+                })
 
         # Sauvegarder le TIFF B03
         with rasterio.open(output_path, "w", **profile) as dst:

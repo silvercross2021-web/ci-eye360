@@ -118,7 +118,7 @@ class DetectionConstructionViewSet(viewsets.ModelViewSet):
         detections_stats = DetectionConstruction.objects.aggregate(
             total_detections=Count('id'),
             detections_infraction=Count('id', filter=Q(status='infraction_zonage')),
-            detections_surveillance=Count('id', filter=Q(status='sous_condition')),
+            detections_sous_condition=Count('id', filter=Q(status='sous_condition')),
             detections_conforme=Count('id', filter=Q(status='conforme')),
             detections_preventive=Count('id', filter=Q(status='surveillance_preventive'))
         )

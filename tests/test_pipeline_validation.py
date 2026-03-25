@@ -20,16 +20,22 @@ import sys
 # Configuration Django
 os.environ.setdefault("DJANGO_SETTINGS_MODULE", "config.settings")
 
-SENTINEL_DIR = os.path.join(
+SENTINEL_EXPORTS = os.path.join(
     os.path.dirname(__file__),
-    "module1_urbanisme", "data_use", "sentinel"
+    "module1_urbanisme", "data_use", "sentinel_api_exports"
 )
 
-T1_B08 = os.path.join(SENTINEL_DIR, "2024-01-29-00-00_2024-01-29-23-59_Sentinel-2_L2A_B08_(Raw).tiff")
-T1_B11 = os.path.join(SENTINEL_DIR, "2024-01-29-00-00_2024-01-29-23-59_Sentinel-2_L2A_B11_(Raw).tiff")
-T2_B04 = os.path.join(SENTINEL_DIR, "2025-01-13-00-00_2025-01-13-23-59_Sentinel-2_L2A_B04_(Raw).tiff")
-T2_B08 = os.path.join(SENTINEL_DIR, "2025-01-13-00-00_2025-01-13-23-59_Sentinel-2_L2A_B08_(Raw).tiff")
-T2_B11 = os.path.join(SENTINEL_DIR, "2025-01-13-00-00_2025-01-13-23-59_Sentinel-2_L2A_B11_(Raw).tiff")
+T1_DATE = "2024-02-15"
+T2_DATE = "2025-01-15"
+
+T1_B04 = os.path.join(SENTINEL_EXPORTS, T1_DATE, f"B04_{T1_DATE}.tif")
+T1_B08 = os.path.join(SENTINEL_EXPORTS, T1_DATE, f"B08_{T1_DATE}.tif")
+T1_B11 = os.path.join(SENTINEL_EXPORTS, T1_DATE, f"B11_{T1_DATE}.tif")
+T1_SCL = os.path.join(SENTINEL_EXPORTS, T1_DATE, f"SCL_{T1_DATE}.tif")
+T2_B04 = os.path.join(SENTINEL_EXPORTS, T2_DATE, f"B04_{T2_DATE}.tif")
+T2_B08 = os.path.join(SENTINEL_EXPORTS, T2_DATE, f"B08_{T2_DATE}.tif")
+T2_B11 = os.path.join(SENTINEL_EXPORTS, T2_DATE, f"B11_{T2_DATE}.tif")
+T2_SCL = os.path.join(SENTINEL_EXPORTS, T2_DATE, f"SCL_{T2_DATE}.tif")
 
 
 def section(title):
