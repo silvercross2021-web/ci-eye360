@@ -14,361 +14,159 @@ Guide complet pour comprendre l'architecture du projet, développer les modules 
 | **Module 2 — Agroécologie** | `module2_agroecologie/` | Squelette Django vide — modèles et pipeline à créer |
 | **Module 3 — Orpaillage** | `module3_orpaillage/` | Squelette Django vide — modèles et pipeline à créer |
 
-### Fichiers partagés (modifier avec accord)
+### Fichiers partagés (modifier avec accord de l'équipe)
 
-| Fichier | Impact |
+| Fichier | Impact si modifié |
 |---|---|
-| `config/settings.py` | Configuration globale Django (GDAL, PostGIS, INSTALLED_APPS) |
-| `config/urls.py` | Routes de toute l'application |
-| `requirements.txt` | Dépendances Python partagées |
-| `templates/module1/base.html` | Thème "Cyber Tactique" dark mode — ne pas réécrire les variables `:root` CSS |
+| `config/settings.py` | Configuration globale Django (GDAL, PostGIS, INSTALLED_APPS) — touche tout le projet |
+| `config/urls.py` | Routes de toute l'application — peut casser les modules existants |
+| `requirements.txt` | Dépendances Python partagées — ajouter manuellement, jamais de pip freeze |
+| `templates/module1/base.html` | Thème "Cyber Tactique" dark mode — ne pas réécrire les variables CSS `:root` |
 
 ---
 
-## 2. Architecture technique du Module 1 (référence pour M2 et M3)
+## 2. Architecture technique du Module 1
 
-Comprendre comment Module 1 fonctionne permet de reproduire le même pattern pour les autres modules.
+Comprendre comment Module 1 fonctionne est indispensable avant de créer M2 ou M3.
 
-### Modèles de données (`models.py`)
+### Les 4 modèles de données
 
-```python
-# 4 modèles PostGIS dans module1_urbanisme/models.py
+**`ZoneCadastrale`** — Représente une zone du plan d'urbanisme de Treichville. Contient la géométrie (polygone PostGIS), le nom de la zone, son type (résidentiel, portuaire, industriel…) et son statut (constructible, conditionnel, interdit). 19 zones sont importées depuis le fichier GeoJSON du plan V10.
 
-ZoneCadastrale           # 19 zones du plan d'urbanisme V10 de Treichville
-                         # Champs : zone_id, name, zone_type, buildable_status, geometry (PolygonField)
+**`ImageSatellite`** — Stocke les métadonnées d'une image Sentinel-2. Ne contient pas les pixels mais les chemins vers les fichiers TIF sur le disque (bandes B04, B08, B11 et le masque SCL). Deux images sont en base : T1 = 15 février 2024, T2 = 15 janvier 2025.
 
-ImageSatellite           # Images Sentinel-2 importées (2 dates : T1 et T2)
-                         # Champs : date_acquisition, bands (JSONField = chemins TIF), classification_map (SCL)
+**`MicrosoftFootprint`** (nom historique, données Google) — Contient les 39 810 empreintes de bâtiments connus issus de Google Open Buildings V3. Sert à identifier les bâtiments pré-existants pour filtrer les faux positifs dans le pipeline de détection.
 
-MicrosoftFootprint       # 39 810 empreintes Google Open Buildings V3
-                         # Champs : geometry (PolygonField), source, confidence_score
-                         # Note : nom historique conservé pour compatibilité migrations
+**`DetectionConstruction`** — Résultat final du pipeline. Chaque enregistrement représente un changement détecté entre T1 et T2, avec sa géométrie PostGIS, ses valeurs NDBI, sa surface estimée, et sa classification (infraction_zonage / sous_condition / conforme / surveillance_preventive). 729 détections sont actuellement en base.
 
-DetectionConstruction    # 729 détections géolocalisées avec statut
-                         # Champs : zone_cadastrale (FK), geometry, ndbi_t1, ndbi_t2, status, alert_level
-                         # status : infraction_zonage / sous_condition / conforme / surveillance_preventive
-                         # alert_level : rouge / orange / vert / veille
-```
+### Le pipeline de traitement (5 étapes)
 
-### Pipeline de traitement (`pipeline/`)
+Le pipeline est déclenché par `python manage.py run_detection` ou `python manage.py pipeline_check`. Il suit toujours les mêmes 5 étapes :
 
-Le pipeline Module 1 suit 5 étapes enchaînées dans `run_detection.py` :
+**Étape 1 — Acquisition.** Les fichiers TIF Sentinel-2 sont lus depuis `data_use/sentinel_api_exports/`. S'ils n'existent pas, ils peuvent être téléchargés via l'API Copernicus CDSE ou Sentinel Hub grâce à `sentinel_data_fetcher.py`.
 
-```
-Étape 1 — Acquisition des images
-  sentinel_data_fetcher.py  →  Télécharge les bandes Sentinel-2 depuis CDSE/SH/GEE
-  Format de sortie : fichiers TIF dans data_use/sentinel_api_exports/{date}/B04_{date}.tif, etc.
+**Étape 2 — Indices spectraux.** Le fichier `ndbi_calculator.py` calcule les indices sur les bandes Sentinel-2. Le NDBI (Normalized Difference Built-up Index) sur T1 et T2 permet de mesurer la densité de surfaces bâties. Le BSI (Bare Soil Index) détecte les terrassements. Le NDVI masque la végétation. Le masque SCL supprime les zones nuageuses et l'eau (lagune Ébrié).
 
-Étape 2 — Calcul des indices spectraux
-  ndbi_calculator.py
-    calculate_ndbi(b08_path, b11_path)           → NDBI = (B11-B08)/(B11+B08)
-    calculate_bsi(b04_path, b08_path, b11_path)  → BSI = (B11+B04-B08)/(B11+B04+B08)
-    calculate_ndvi(b04_path, b08_path)            → NDVI = (B08-B04)/(B08+B04)
-    detect_changes(ndbi_t1, ndbi_t2, bsi, ndvi)  → masques new_constructions + soil_activity + demolished
-    apply_scl_mask(array, scl_path)               → exclut nuages + eau (classes SCL 3,6,8,9,10)
+**Étape 3 — Détection IA.** Soit K-Means (recommandé, sans GPU) compare les clusters spectraux entre T1 et T2 pour identifier les pixels qui sont passés de "sol" à "bâti". Soit TinyCD (réseau de neurones PyTorch) analyse les paires d'images directement.
 
-Étape 3 — Détection IA
-  ai_detector.py              → K-Means clustering (scikit-learn, sans GPU, recommandé)
-  deep_learning_detector.py   → TinyCD (PyTorch, poids levir_best.pth)
+**Étape 4 — Extraction des régions.** Les pixels détectés sont regroupés en composantes connexes (zones géographiques contiguës). Chaque région trop petite (moins de 2 pixels, soit moins de 200m²) est filtrée. Chaque région est convertie de coordonnées pixel en coordonnées GPS WGS84.
 
-Étape 4 — Extraction des régions
-  ndbi_calculator.py
-    extract_change_regions(mask, min_size=2)
-    → composantes connexes (scipy.ndimage.label)
-    → chaque région = {centroid, bbox, size_pixels}
+**Étape 5 — Vérification 4 couches.** Chaque région candidate passe par 4 filtres anti-faux-positifs, gérés par `verification_4_couches.py` :
+- Couche 1 : si un bâtiment Google V3 avec confiance ≥ 0.75 existe déjà à cet endroit → rejeté comme faux positif
+- Couche 2 : la zone cadastrale détermine le statut (interdit → rouge, conditionnel → orange, constructible → vert)
+- Couche 3 : cohérence des valeurs spectrales T1/T2/BSI — filtre les incohérences
+- Couche 4 : surface minimale et coordonnées dans la bounding box de Treichville
 
-Étape 5 — Vérification 4 couches
-  verification_4_couches.py
-    DetectionPipeline.verify_detection(region)
-    Couche 1 : Google Buildings V3 (confidence ≥ 0.75 → faux positif)
-    Couche 2 : Plan cadastral (forbidden→rouge, conditional→orange, buildable→vert)
-    Couche 3 : Cohérence NDBI T1/T2/BSI (filtre démolitions faussement détectées)
-    Couche 4 : Surface ≥ 200m², coordonnées dans BBOX Treichville
-```
+### Les management commands
 
-### Management commands
+Chaque opération d'import/export/détection est une commande Django dans `module1_urbanisme/management/commands/`. Toutes les commandes acceptent `--dry-run` pour un aperçu sans modification de la base.
 
-Chaque import/export/pipeline = une commande Django dans `management/commands/` :
+| Commande | Rôle |
+|---|---|
+| `import_cadastre` | Lit le GeoJSON des zones et crée les 19 `ZoneCadastrale` |
+| `import_sentinel` | Lit les TIF locaux et crée les enregistrements `ImageSatellite` |
+| `import_sentinel_api` | Télécharge les images depuis CDSE/SH et crée les TIF + `ImageSatellite` |
+| `import_google_buildings` | Interroge GEE et importe les 39 810 empreintes Google V3 |
+| `import_google_temporal_v1` | Analyse les snapshots GEE Temporal V1 (pas importable en masse) |
+| `export_footprints` | Sauvegarde les empreintes en GeoJSON (backup) |
+| `pipeline_check` | 2 volets : vérification système puis détection |
+| `run_detection` | Pipeline de détection complet (K-Means ou TinyCD) |
 
-```
-import_cadastre.py         → lit data_use/cadastre_*.geojson → crée ZoneCadastrale
-import_sentinel.py         → lit data_use/sentinel_api_exports/ → crée ImageSatellite
-import_sentinel_api.py     → télécharge via API → crée TIF + ImageSatellite
-import_google_buildings.py → GEE FeatureCollection → bulk_create MicrosoftFootprint
-import_google_temporal_v1.py → GEE ImageCollection de tuiles S2 (pas importable en masse)
-export_footprints.py       → MicrosoftFootprint → GeoJSON (backup)
-run_detection.py           → pipeline principal complet
-pipeline_check.py          → volet 1 vérification + volet 2 détection
-```
+### L'API REST
 
-### API REST
-
-Routes dans `module1_urbanisme/urls.py`, branchées dans `config/urls.py` sous `/api/v1/` :
-
-```python
-# ViewSets DRF dans views.py
-ZoneCadastraleViewSet         → /api/v1/zones-cadastrales/
-DetectionConstructionViewSet  → /api/v1/detections/
-ImageSatelliteViewSet         → /api/v1/images/
-
-# Vues fonctionnelles dans views.py
-dashboard_resume              → /api/v1/dashboard/resume/
-detection_statistics          → /api/v1/detections/statistics/
-
-# Vues web HTML dans views_web.py
-dashboard                     → /
-detections_list               → /detections/
-detection_detail              → /detections/{id}/
-zones_list                    → /zones/
-```
+Toutes les routes Module 1 sont dans `module1_urbanisme/urls.py` et branchées dans `config/urls.py` sous le préfixe `/api/v1/`. Les endpoints principaux sont `/api/v1/zones-cadastrales/`, `/api/v1/detections/`, `/api/v1/detections/statistics/` et `/api/v1/dashboard/resume/`. Les vues web HTML (dashboard, liste des détections, détail) sont dans `views_web.py` et accessibles via `/`, `/detections/` et `/zones/`.
 
 ---
 
 ## 3. Guide — Créer le Module 2 (Agroécologie)
 
-Le squelette `module2_agroecologie/` existe déjà. Voici comment le développer complètement.
+Le dossier `module2_agroecologie/` existe déjà dans le projet avec un squelette Django vide. Voici les étapes pour le développer.
 
-### Étape 1 — Définir les modèles
+### Étape 1 — Définir les modèles dans `module2_agroecologie/models.py`
 
-```python
-# module2_agroecologie/models.py
+S'inspirer des 4 modèles de Module 1 et les adapter au contexte agroécologique. Le module a besoin d'au moins 3 modèles :
 
-from django.contrib.gis.db import models
+- **Un modèle de zone géographique** (équivalent de `ZoneCadastrale`) — représente une zone agricole ou forestière surveillée. Champs recommandés : nom, type de culture, région administrative, géométrie PostGIS (PolygonField avec srid=4326).
 
-class ZoneAgricole(models.Model):
-    """Zone agricole surveillée (équivalent de ZoneCadastrale en M1)"""
-    nom = models.CharField(max_length=200)
-    culture_principale = models.CharField(max_length=100, blank=True)
-    geometry = models.PolygonField(srid=4326, null=True)
-    # Ajouter les champs spécifiques agroécologie...
+- **Un modèle d'image satellite** — peut réutiliser directement `ImageSatellite` de Module 1 si les mêmes images couvrent la zone, ou créer un modèle dédié avec les mêmes champs (date_acquisition, bands JSONField pour les chemins TIF, classification_map pour le SCL).
 
-    class Meta:
-        verbose_name = "Zone Agricole"
+- **Un modèle d'alerte** (équivalent de `DetectionConstruction`) — représente un événement détecté (déforestation, changement de culture, sécheresse…). Champs recommandés : zone (ForeignKey), géométrie PostGIS, valeurs NDVI T1/T2, type d'alerte, niveau de confiance, date de détection.
 
-class ImageSatelliteAgro(models.Model):
-    """Images satellites pour analyse végétation (réutilise la même structure que M1)"""
-    date_acquisition = models.DateField()
-    bands = models.JSONField(default=dict)  # B04/B08/B11/SCL comme M1
-    zone = models.ForeignKey(ZoneAgricole, on_delete=models.CASCADE, null=True)
+**Important :** toujours importer depuis `django.contrib.gis.db` (pas `django.db`) pour avoir accès aux champs géospatiaux. Toujours utiliser `srid=4326` (WGS84) pour la cohérence avec le reste du projet.
 
-class AlerteDeforestation(models.Model):
-    """Alerte de déforestation ou de changement de culture (équivalent DetectionConstruction)"""
-    STATUT_CHOICES = [
-        ('deforestation', 'Déforestation confirmée'),
-        ('changement_culture', 'Changement de culture'),
-        ('surveillance', 'En surveillance'),
-    ]
-    date_detection = models.DateTimeField(auto_now_add=True)
-    zone = models.ForeignKey(ZoneAgricole, on_delete=models.CASCADE, null=True)
-    geometry = models.PolygonField(srid=4326, null=True)
-    ndvi_t1 = models.FloatField()   # NDVI avant
-    ndvi_t2 = models.FloatField()   # NDVI après
-    statut = models.CharField(max_length=30, choices=STATUT_CHOICES)
-    confidence = models.FloatField(default=0.0)
-```
+### Étape 2 — Vérifier que le module est dans INSTALLED_APPS
 
-### Étape 2 — Enregistrer dans INSTALLED_APPS
+Ouvrir `config/settings.py` et vérifier que `module2_agroecologie` est bien dans la liste `INSTALLED_APPS`. Il devrait déjà y être dans le squelette.
 
-```python
-# config/settings.py — déjà enregistré normalement, vérifier :
-INSTALLED_APPS = [
-    ...
-    'module1_urbanisme',
-    'module2_agroecologie',   # ← vérifier que c'est présent
-    'module3_orpaillage',
-]
-```
+### Étape 3 — Créer les migrations
 
-### Étape 3 — Créer et appliquer les migrations
+Une fois les modèles définis, générer les migrations avec `python manage.py makemigrations module2_agroecologie` puis les appliquer avec `python manage.py migrate`.
 
-```bash
-python manage.py makemigrations module2_agroecologie
-python manage.py migrate
-```
+### Étape 4 — Créer le pipeline de calcul dans `module2_agroecologie/pipeline/`
 
-### Étape 4 — Créer le pipeline NDVI
+S'inspirer de `module1_urbanisme/pipeline/ndbi_calculator.py`. Le fichier de base pour M2 est un calculateur NDVI (Normalized Difference Vegetation Index) qui lit deux fichiers TIF (B04 et B08) et retourne un tableau numpy. La formule est `NDVI = (B08 − B04) / (B08 + B04)`. Valeurs entre -1 et +1 — végétation dense ≈ +0.6, sol nu ≈ 0, eau ≈ -0.3.
 
-```python
-# module2_agroecologie/pipeline/ndvi_calculator.py
-# S'inspirer de module1_urbanisme/pipeline/ndbi_calculator.py
+Il est aussi possible de réutiliser directement `NDBICalculator` de Module 1 qui contient déjà `calculate_ndvi()`, `extract_change_regions()`, et `apply_scl_mask()`. Il n'est pas nécessaire de réécrire ces fonctions.
 
-import numpy as np
-import rasterio
+### Étape 5 — Créer la management command dans `module2_agroecologie/management/commands/`
 
-def calculate_ndvi(b04_path: str, b08_path: str) -> np.ndarray:
-    """NDVI = (B08 - B04) / (B08 + B04) — Végétation, valeurs -1 à +1"""
-    with rasterio.open(b04_path) as r4, rasterio.open(b08_path) as r8:
-        b04 = r4.read(1).astype(float)
-        b08 = r8.read(1).astype(float)
-    denom = b08 + b04
-    ndvi = np.where(denom == 0, 0.0, (b08 - b04) / denom)
-    return np.clip(ndvi, -1.0, 1.0)
+Créer un fichier `run_detection_agro.py` en s'inspirant de `run_detection.py` de Module 1. La structure est toujours la même : une classe `Command` qui hérite de `BaseCommand`, une méthode `add_arguments` pour les options CLI, et une méthode `handle` qui exécute le pipeline. Les étapes : récupérer les images → calculer NDVI T1 et T2 → détecter les zones de perte de végétation → extraire les régions → sauvegarder les alertes en base.
 
-def calculate_ndwi(b03_path: str, b08_path: str) -> np.ndarray:
-    """NDWI = (B03 - B08) / (B03 + B08) — Eau, valeurs -1 à +1"""
-    # Utile pour détecter les surfaces irriguées
-    ...
+### Étape 6 — Créer `module2_agroecologie/urls.py` et brancher dans `config/urls.py`
 
-def detect_vegetation_loss(ndvi_t1, ndvi_t2, threshold=0.15) -> np.ndarray:
-    """Pixels où NDVI a baissé de plus de threshold → perte de végétation"""
-    return (ndvi_t1 - ndvi_t2) > threshold
-```
+Créer un fichier `urls.py` dans le module 2 avec les routes API (DRF Router) et/ou les vues web. Puis dans `config/urls.py`, ajouter l'inclusion sous un préfixe dédié — par exemple `/api/v2/` pour l'API REST et `/module2/` pour l'interface web.
 
-### Étape 5 — Créer la management command
+### Étape 7 — Créer les tests dans `test_special/test_AGRO.py`
 
-```python
-# module2_agroecologie/management/commands/run_detection_agro.py
-# S'inspirer de module1_urbanisme/management/commands/run_detection.py
-
-from django.core.management.base import BaseCommand
-from module2_agroecologie.models import ImageSatelliteAgro, AlerteDeforestation
-from module2_agroecologie.pipeline.ndvi_calculator import calculate_ndvi, detect_vegetation_loss
-
-class Command(BaseCommand):
-    help = "Pipeline de détection de déforestation"
-
-    def add_arguments(self, parser):
-        parser.add_argument("--date-t1", type=str, required=True)
-        parser.add_argument("--date-t2", type=str, required=True)
-
-    def handle(self, *args, **options):
-        # Récupérer les images
-        img_t1 = ImageSatelliteAgro.objects.get(date_acquisition=options["date_t1"])
-        img_t2 = ImageSatelliteAgro.objects.get(date_acquisition=options["date_t2"])
-
-        # Calcul NDVI
-        ndvi_t1 = calculate_ndvi(img_t1.bands["B04"], img_t1.bands["B08"])
-        ndvi_t2 = calculate_ndvi(img_t2.bands["B04"], img_t2.bands["B08"])
-
-        # Détection des pertes
-        mask_deforestation = detect_vegetation_loss(ndvi_t1, ndvi_t2)
-
-        # Extraction régions + sauvegarde...
-        self.stdout.write(self.style.SUCCESS("Pipeline agroécologie terminé"))
-```
-
-### Étape 6 — Brancher les URLs
-
-```python
-# module2_agroecologie/urls.py (créer ce fichier)
-from django.urls import path, include
-from rest_framework.routers import DefaultRouter
-from . import views
-
-router = DefaultRouter()
-# router.register('alertes', AlerteDeforestationViewSet)
-
-urlpatterns = [
-    path('', include(router.urls)),
-]
-```
-
-```python
-# config/urls.py — ajouter :
-urlpatterns = [
-    ...
-    path('api/v2/', include('module2_agroecologie.urls')),   # ← ajouter
-    path('module2/', include('module2_agroecologie.urls')),  # ← pour l'UI web
-]
-```
-
-### Étape 7 — Tests
-
-```python
-# test_special/test_AGRO.py (créer ce fichier en s'inspirant de test_PIPE.py)
-# Ajouter "AGRO" dans la liste SUITES de run_tests.py
-```
+S'inspirer de `test_PIPE.py` ou `test_DB.py`. Le fichier doit respecter exactement le même format que les autres suites : fonctions `ok()`, `fail()`, `warn()`, et un résumé final `OK: X | FAIL: Y | TOTAL: Z`. Une fois le fichier créé, ajouter `"AGRO"` dans la liste `ALL_SUITES` de `run_tests.py` pour qu'il soit inclus dans les tests globaux.
 
 ---
 
 ## 4. Guide — Créer le Module 3 (Orpaillage)
 
-Même pattern que Module 2. Indices spectraux recommandés pour l'orpaillage :
+Le principe est identique au Module 2. La différence principale réside dans les indices spectraux utilisés.
 
-```
-MNDWI  = (B03 - B11) / (B03 + B11)  → Turbidité de l'eau (terres déblayées)
-NDTI   = (B04 - B03) / (B04 + B03)  → Turbidité (rouge - vert)
-Band11 élevé + NDVI bas               → Sol nu / boue = indice d'orpaillage
-```
+L'orpaillage illégal dans les rivières se caractérise par une turbidité anormale de l'eau (eau boueuse à cause des terrassements) et la présence de sol nu et de boue en bordure des cours d'eau. Les indices recommandés pour la détection sont :
 
-### Structure suggérée
+- **MNDWI** (Modified NDWI) = (B03 − B11) / (B03 + B11) → mesure la turbidité de l'eau. Une valeur très élevée indique une eau chargée en sédiments.
+- **NDTI** (Normalized Difference Turbidity Index) = (B04 − B03) / (B04 + B03) → turbidité par différence rouge-vert.
+- Combinaison B11 élevé + NDVI bas = sol nu ou boue en zone normalement végétalisée → indice fort d'orpaillage.
 
-```
-module3_orpaillage/
-├── models.py
-│   ├── CoursDEau              # Rivière surveillée avec géométrie
-│   ├── ImageSatelliteOrp      # Images satellites pour la zone
-│   └── AlerteOrpaillage       # Alerte orpaillage avec coordonnées GPS
-├── pipeline/
-│   ├── turbidite_calculator.py  # MNDWI, NDTI
-│   └── orpaillage_detector.py   # Détection zones d'orpaillage
-└── management/commands/
-    └── run_detection_orp.py
-```
+La structure de dossiers suggérée pour Module 3 est la même que Module 2, avec un `models.py` contenant un modèle de cours d'eau surveillé, un modèle d'image satellite, et un modèle d'alerte d'orpaillage. Le pipeline va dans `module3_orpaillage/pipeline/` et les commandes dans `module3_orpaillage/management/commands/`.
 
 ---
 
-## 5. Indices spectraux par module
+## 5. Indices spectraux de référence
 
-| Indice | Formule | Module | Usage |
-|---|---|---|---|
-| **NDBI** | (B11−B08)/(B11+B08) | M1 | Surfaces bâties |
-| **BSI** | (B11+B04−B08)/(B11+B04+B08) | M1 | Sol nu (terrassement) |
-| **NDVI** | (B08−B04)/(B08+B04) | M1+M2 | Végétation |
-| **NDWI** | (B03−B08)/(B03+B08) | M1+M2 | Eau / humidité |
-| **BUI** | NDBI − NDVI | M1 | Built-Up Index (filtre végétation) |
-| **MNDWI** | (B03−B11)/(B03+B11) | M3 | Turbidité rivières |
-| **NDTI** | (B04−B03)/(B04+B03) | M3 | Turbidité (couleur eau) |
+| Indice | Formule | Bandes utilisées | Module | Ce qu'il détecte |
+|---|---|---|---|---|
+| **NDBI** | (B11 − B08) / (B11 + B08) | SWIR1, NIR | M1 | Surfaces bâties (toits, béton, tôle) |
+| **BSI** | (B11 + B04 − B08) / (B11 + B04 + B08) | SWIR1, Rouge, NIR | M1 | Sol nu, terrassements |
+| **NDVI** | (B08 − B04) / (B08 + B04) | NIR, Rouge | M1 + M2 | Végétation verte, couvert forestier |
+| **NDWI** | (B03 − B08) / (B03 + B08) | Vert, NIR | M1 + M2 | Eau, surfaces irriguées |
+| **BUI** | NDBI − NDVI | — | M1 | Built-Up Index — filtre la végétation des zones bâties |
+| **MNDWI** | (B03 − B11) / (B03 + B11) | Vert, SWIR1 | M3 | Turbidité des rivières |
+| **NDTI** | (B04 − B03) / (B04 + B03) | Rouge, Vert | M3 | Turbidité par couleur de l'eau |
 
 ---
 
-## 6. Conventions de code
+## 6. Conventions de développement
 
-### Nommage
+### Nommage des fichiers et classes
 
-- **Modèles** : `NomEnPascalCase` (ex: `AlerteDeforestation`, `ZoneAgricole`)
-- **Commandes** : `run_detection_agro.py`, `import_zones_agro.py`
-- **Pipeline** : fichiers nommés selon leur fonction (`ndvi_calculator.py`, `turbidite_calculator.py`)
+Les modèles Django sont nommés en PascalCase (ex: `AlerteDeforestation`, `ZoneAgricole`, `CoursDEau`). Les commandes management sont nommées en snake_case avec un préfixe d'action (ex: `run_detection_agro.py`, `import_zones_agro.py`, `export_alertes.py`). Les fichiers de pipeline sont nommés selon leur fonction principale (ex: `ndvi_calculator.py`, `turbidite_calculator.py`).
 
-### Structure d'une commande Django
+### Règles PostGIS
 
-```python
-from django.core.management.base import BaseCommand
+Toujours importer les modèles depuis `django.contrib.gis.db` et non `django.db`. Toujours utiliser `srid=4326` (WGS84) pour tous les champs géométriques — c'est la référence spatiale utilisée dans tout le projet et les données Google/Copernicus. Ne pas utiliser d'autres SRID sans conversion explicite.
 
-class Command(BaseCommand):
-    help = "Description courte de la commande"
+### Règles rasterio
 
-    def add_arguments(self, parser):
-        parser.add_argument("--date-t1", type=str, help="Date T1 (YYYY-MM-DD)")
-        parser.add_argument("--dry-run", action="store_true", help="Sans écriture en base")
+Toujours lire les fichiers TIF en utilisant `rasterio.open()` dans un bloc `with`. Toujours convertir les tableaux numpy en `float` avant les calculs (`astype(float)`). Toujours protéger contre la division par zéro avec `np.where(denominateur == 0, 0.0, ...)`. Toujours clipper les résultats entre -1.0 et +1.0. Ne jamais utiliser `'EPSG:4326'` comme CRS dans rasterio — préférer la chaîne proj4 `'+proj=longlat +datum=WGS84 +no_defs'` pour éviter les conflits avec la base PROJ de PostgreSQL sur Windows.
 
-    def handle(self, *args, **options):
-        self.stdout.write("Début...")
-        # Code ici
-        self.stdout.write(self.style.SUCCESS("Terminé"))
-```
+### Règles pour les management commands
 
-### Modèle avec géométrie PostGIS
-
-```python
-from django.contrib.gis.db import models  # Pas django.db.models
-
-class MonModele(models.Model):
-    geometry = models.PolygonField(srid=4326, null=True)
-    # Toujours srid=4326 (WGS84) pour cohérence avec le reste du projet
-```
-
-### Lire un fichier TIF avec rasterio
-
-```python
-import rasterio
-import numpy as np
-
-with rasterio.open(chemin_tif) as src:
-    array = src.read(1).astype(float)   # Bande 1 (unique pour Sentinel-2 mono-bande)
-    transform = src.transform            # Transform affine (pixel → coordonnées géo)
-    crs = src.crs                        # Système de référence
-```
+Toujours hériter de `BaseCommand`. Toujours implémenter `--dry-run` pour tester sans écriture en base. Utiliser `self.stdout.write(self.style.SUCCESS(...))` pour les succès, `self.style.ERROR(...)` pour les erreurs, `self.style.WARNING(...)` pour les avertissements. Ne jamais utiliser `print()` dans une commande.
 
 ---
 
@@ -376,160 +174,64 @@ with rasterio.open(chemin_tif) as src:
 
 ### Règles absolues
 
-- ❌ **Jamais** `git push -f` sur `main`
-- ❌ **Jamais** commiter `.env`, `db.sqlite3`, `venv/`, `*.pth` > 50 Mo
-- ❌ **Jamais** `pip freeze > requirements.txt` (écrase les commentaires du fichier)
-- ❌ **Jamais** modifier les migrations d'un autre module sans accord
+- Ne jamais faire `git push -f` sur `main` — supprime le code de façon irréversible
+- Ne jamais commiter `.env`, `db.sqlite3`, `venv/`, ou des fichiers `.pth` supérieurs à 50 Mo
+- Ne jamais faire `pip freeze > requirements.txt` — ajouter les dépendances manuellement ligne par ligne
+- Ne jamais modifier les migrations d'un autre module sans accord explicite
+- Toujours travailler sur une branche, jamais directement sur `main`
 
-### Branches
+### Nomenclature des branches
 
-```
-feature/module2-nom-fonctionnalite
-feature/module3-nom-fonctionnalite
-bugfix/module1-description-bug
-hotfix/description-urgente
-```
+Les branches suivent le format `type/module-description`. Exemples : `feature/module2-detection-ndvi`, `feature/module3-turbidite-orpaillage`, `bugfix/module1-correction-seuil-ndbi`, `hotfix/fix-crash-serializer`.
 
-### Cycle quotidien
+### Cycle de travail quotidien
 
-```bash
-# Matin — récupérer les derniers changements
-git checkout main
-git pull origin main
-
-# Créer sa branche de travail
-git checkout -b feature/module2-detection-ndvi
-
-# Travailler, commiter souvent
-git add module2_agroecologie/models.py
-git commit -m "feat(mod2): ajout modèle AlerteDeforestation avec géométrie PostGIS"
-
-# Pousser sa branche
-git push -u origin feature/module2-detection-ndvi
-
-# Créer une Pull Request sur GitHub avant de fusionner sur main
-```
+Au début de chaque session, récupérer les modifications de `main` (`git pull origin main`), créer ou basculer sur sa branche de travail, commiter régulièrement avec des messages clairs, puis pousser sa branche et créer une Pull Request sur GitHub avant de fusionner sur `main`.
 
 ### Format des messages de commit
 
-```
-feat(mod2):     nouvelle fonctionnalité Module 2
-fix(mod1):      correction bug Module 1
-docs:           documentation uniquement
-test(mod2):     ajout ou correction de tests
-refactor(mod2): refactorisation sans changement de comportement
-chore:          tâche de maintenance (dépendances, config)
-```
+Les messages suivent le format `type(module): description`. Les types disponibles sont `feat` (nouvelle fonctionnalité), `fix` (correction de bug), `docs` (documentation), `test` (tests), `refactor` (refactorisation sans changement de comportement), et `chore` (maintenance). Exemples : `feat(mod2): ajout modèle AlerteDeforestation PostGIS`, `fix(mod1): correction seuil NDBI pour tôle ivoirienne`, `docs: mise à jour CONTRIBUTING.md`.
 
-### Résoudre un conflit
+### Résoudre un conflit Git
 
-```bash
-git checkout ma-branche
-git pull origin main          # Récupère les nouveautés de main
-# Résoudre les blocs <<< === >>> dans VSCode
-git add fichier_corrige.py
-git commit -m "fix: résolution conflit avec main"
-git push
-```
+Basculer sur sa branche, faire `git pull origin main` pour récupérer les nouveautés, résoudre les blocs de conflit `<<<< ==== >>>>` dans l'éditeur, puis commiter la résolution et repousser.
 
 ---
 
-## 8. Vérification avant tout push
+## 8. Vérifications obligatoires avant tout push
 
-```bash
-# Obligatoire — 0 erreur tolérée
-python manage.py check
+Avant de pousser quoi que ce soit sur GitHub, trois vérifications sont obligatoires :
 
-# Suites de tests (doit rester 0 FAIL)
-python run_tests.py --fast
+1. **`python manage.py check`** — doit retourner 0 erreur. Si des erreurs apparaissent, elles doivent être corrigées avant tout push.
 
-# Vérification système complète
-python manage.py pipeline_check --verify-only
-```
+2. **`python run_tests.py --fast`** — doit retourner 0 FAIL. Les WARNs sont acceptables (4 en config dev), mais aucun FAIL n'est toléré.
+
+3. **`python manage.py pipeline_check --verify-only`** — vérifie que les 8 prérequis système (Django, images, TIF, V3, cadastre, TinyCD, GEE) sont tous verts.
 
 ---
 
-## 9. Ajouter un test pour son module
+## 9. Ajouter des tests pour son module
 
-```python
-# test_special/test_AGRO.py
-import os, sys, traceback
-sys.path.insert(0, os.path.dirname(os.path.dirname(os.path.abspath(__file__))))
-os.environ.setdefault("DJANGO_SETTINGS_MODULE", "config.settings")
+Créer un fichier `test_special/test_NOMDUMODULE.py` en s'inspirant exactement de `test_PIPE.py` ou `test_DB.py`. Le fichier doit impérativement respecter le même format que les autres suites — les fonctions `ok()`, `fail()`, `warn()` avec le même préfixe `  [OK]`, `  [FAIL]`, `  [WARN]` pour que `run_tests.py` puisse compter les résultats. Le fichier doit afficher un résumé final au format `OK: X | WARN: Y | FAIL: Z | TOTAL: T`.
 
-RESULTS = []
-
-def ok(name):
-    RESULTS.append(("OK", name))
-    print(f"  [OK]   {name}")
-
-def fail(name, detail=""):
-    RESULTS.append(("FAIL", name, detail))
-    print(f"  [FAIL] {name}")
-    if detail:
-        print(f"         {detail[:300]}")
-
-print("\n=== TEST AGRO : Module 2 Agroécologie ===\n")
-
-import django
-django.setup()
-
-# AGRO-01 : Modèles importables
-try:
-    from module2_agroecologie.models import ZoneAgricole, AlerteDeforestation
-    ok("AGRO-01 : Modèles Module 2 importables")
-except Exception as e:
-    fail("AGRO-01 : Modèles Module 2", str(e)[:200])
-
-# AGRO-02 : NDVI calculator
-try:
-    from module2_agroecologie.pipeline.ndvi_calculator import calculate_ndvi
-    ok("AGRO-02 : calculate_ndvi importable")
-except Exception as e:
-    fail("AGRO-02 : ndvi_calculator", str(e)[:200])
-
-# Ajouter d'autres tests...
-
-print("\n--- RÉSUMÉ AGRO ---")
-nb_ok   = sum(1 for r in RESULTS if r[0] == "OK")
-nb_fail = sum(1 for r in RESULTS if r[0] == "FAIL")
-print(f"OK: {nb_ok} | FAIL: {nb_fail} | TOTAL: {nb_ok+nb_fail}")
-```
-
-Puis ajouter `"AGRO"` dans `run_tests.py` :
-
-```python
-ALL_SUITES = ["ENV", "DB", "DB_REAL", "PIPE", "PIPE_REAL", "API", "WEB", "CMD", "ROB", "CIV", "AGRO"]
-```
+Une fois le fichier créé, ajouter le nom de la suite (ex: `"AGRO"`) dans la liste `ALL_SUITES` du fichier `run_tests.py` à la racine du projet.
 
 ---
 
 ## 10. Réutiliser le pipeline Sentinel-2 de Module 1
 
-Tous les modules peuvent réutiliser les composants de Module 1 sans les copier.
+Tous les modules peuvent importer directement les composants de Module 1 sans les copier. Le fichier `ndbi_calculator.py` contient déjà les fonctions `calculate_ndvi()`, `calculate_bsi()`, `extract_change_regions()`, `apply_scl_mask()`, et `compute_confidence()` qui sont utiles pour tous les modules. Le fichier `sentinel_data_fetcher.py` gère automatiquement la priorité entre les sources (CDSE → Sentinel Hub → Planetary Computer → GEE).
 
-```python
-# Dans module2_agroecologie/ — importer directement depuis M1
-from module1_urbanisme.pipeline.ndbi_calculator import NDBICalculator
-from module1_urbanisme.pipeline.sentinel_data_fetcher import SentinelDataFetcher
-from module1_urbanisme.models import ImageSatellite   # Réutiliser les mêmes images
-
-# NDBICalculator contient aussi calculate_ndvi, calculate_bsi, extract_change_regions, etc.
-calc = NDBICalculator()
-ndvi = calc.calculate_ndvi(b04_path, b08_path)
-regions = calc.extract_change_regions(mask, min_size=2)
-```
-
-Les images Sentinel-2 en base (`ImageSatellite`) sont partagées — tous les modules peuvent les utiliser. Il n'est pas nécessaire de ré-importer des images si elles couvrent la même zone et les mêmes dates.
+Les images Sentinel-2 en base (`ImageSatellite`) sont partagées entre tous les modules. Il n'est pas nécessaire de ré-importer des images qui couvrent déjà la zone et les dates souhaitées.
 
 ---
 
-## 11. Documentation des fichiers clés
+## 11. Documentation de référence
 
-| Fichier | À lire pour... |
+| Document | À lire pour... |
 |---|---|
-| `README.md` | Vue d'ensemble, installation, toutes les commandes |
-| `analyse_complet_1.F.md` | Audit technique exhaustif Module 1 (142 Ko) — todos les bugs connus, corrections, limitations |
+| `README.md` | Vue d'ensemble, installation, toutes les commandes avec leurs options |
+| `analyse_complet_1.F.md` | Audit technique exhaustif Module 1 (142 Ko) — tous les bugs connus, corrections appliquées, limitations documentées |
 | `AUDIT FINAL MODULE 1.md` | Résumé non-technique du pipeline pour la présentation |
-| `module1_urbanisme/pipeline/verification_4_couches.py` | Comprendre la logique de classification rouge/orange/vert/veille |
-| `module1_urbanisme/management/commands/run_detection.py` | Comprendre le pipeline complet (800 lignes, très documenté) |
+| `module1_urbanisme/pipeline/verification_4_couches.py` | Logique complète de classification rouge/orange/vert/veille |
+| `module1_urbanisme/management/commands/run_detection.py` | Pipeline principal complet commenté (800 lignes) — référence pour créer M2/M3 |
