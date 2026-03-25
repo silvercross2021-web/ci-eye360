@@ -116,64 +116,36 @@ except AttributeError as e:
 except Exception as e:
     fail("CMD-07 : BUILDABLE_STATUS_CHOICES", str(e)[:200])
 
-# CMD-08 : import_microsoft importable
+# CMD-08 : import_google_buildings importable et BBOX correcte
 try:
-    from module1_urbanisme.management.commands.import_microsoft import Command as ImportMicrosoft
-    ok("CMD-08 : import_microsoft.Command importable")
+    from module1_urbanisme.management.commands.import_google_buildings import Command as ImportGoogleBuildings, TREICHVILLE_BBOX, MIN_CONFIDENCE
+    assert len(TREICHVILLE_BBOX) == 4, "BBOX doit avoir 4 éléments [minLon, minLat, maxLon, maxLat]"
+    assert -4.1 < TREICHVILLE_BBOX[0] < -3.9, f"minLon hors plage Treichville: {TREICHVILLE_BBOX[0]}"
+    assert 0.6 <= MIN_CONFIDENCE <= 0.75, f"MIN_CONFIDENCE hors plage: {MIN_CONFIDENCE}"
+    ok(f"CMD-08 : import_google_buildings importable — BBOX={TREICHVILLE_BBOX} MIN_CONFIDENCE={MIN_CONFIDENCE}")
 except Exception as e:
-    fail("CMD-08 : import_microsoft import", traceback.format_exc()[-300:])
+    fail("CMD-08 : import_google_buildings import", traceback.format_exc()[-300:])
 
-# CMD-09 : import_microsoft._is_in_bbox() logique AABB
+# CMD-09 : export_footprints importable
 try:
-    from module1_urbanisme.management.commands.import_microsoft import Command
-    cmd = Command()
-    bbox = {"min_lon": -4.03, "min_lat": 5.28, "max_lon": -3.97, "max_lat": 5.32}
-    feature_inside = {
-        "geometry": {"type": "Polygon", "coordinates": [[
-            [-4.01, 5.30], [-4.009, 5.30], [-4.009, 5.301], [-4.01, 5.301], [-4.01, 5.30]
-        ]]}
-    }
-    feature_outside = {
-        "geometry": {"type": "Polygon", "coordinates": [[
-            [-5.0, 6.0], [-4.99, 6.0], [-4.99, 6.01], [-5.0, 6.01], [-5.0, 6.0]
-        ]]}
-    }
-    assert cmd._is_in_bbox(feature_inside, bbox) == True, "Feature dans bbox non détectée"
-    assert cmd._is_in_bbox(feature_outside, bbox) == False, "Feature hors bbox faussement incluse"
-    ok("CMD-09 : import_microsoft._is_in_bbox() AABB OK")
+    from module1_urbanisme.management.commands.export_footprints import Command as ExportFootprints
+    ok("CMD-09 : export_footprints.Command importable")
 except Exception as e:
-    fail("CMD-09 : _is_in_bbox()", traceback.format_exc()[-300:])
+    fail("CMD-09 : export_footprints import", traceback.format_exc()[-300:])
 
-# CMD-10 : import_microsoft._parse_feature() — source Microsoft_2020 ?
+# CMD-10 : pipeline_check importable (nouveau script 2 volets)
 try:
-    from module1_urbanisme.management.commands.import_microsoft import Command
-    cmd = Command()
-    feature = {
-        "geometry": {"type": "Polygon", "coordinates": [[
-            [-4.01, 5.30], [-4.009, 5.30], [-4.009, 5.301], [-4.01, 5.301], [-4.01, 5.30]
-        ]]}
-    }
-    result = cmd._parse_feature(feature)
-    if result.get('source_file') == 'Abidjan_33333010.geojsonl':
-        # Source 'source' field n'est pas dans _parse_feature — vérifie la valeur default model
-        from module1_urbanisme.models import MicrosoftFootprint
-        fp = MicrosoftFootprint(**result)
-        if fp.source == 'Google_V3_2023':
-            warn("CMD-10 : import_microsoft crée des empreintes avec source='Google_V3_2023' par défaut",
-                 "Des empreintes Microsoft seront identifiées comme Google_V3_2023 !")
-        else:
-            ok(f"CMD-10 : import_microsoft source = '{fp.source}'")
-    else:
-        ok("CMD-10 : import_microsoft._parse_feature() OK")
+    from module1_urbanisme.management.commands.pipeline_check import Command as PipelineCheck
+    ok("CMD-10 : pipeline_check.Command importable (volet 1 + volet 2)")
 except Exception as e:
-    fail("CMD-10 : import_microsoft._parse_feature()", traceback.format_exc()[-300:])
+    fail("CMD-10 : pipeline_check import", traceback.format_exc()[-300:])
 
-# CMD-11 : import_google_buildings importable
+# CMD-11 : import_google_temporal_v1 importable
 try:
-    from module1_urbanisme.management.commands.import_google_buildings import Command as ImportGoogle
-    ok("CMD-11 : import_google_buildings.Command importable")
+    from module1_urbanisme.management.commands.import_google_temporal_v1 import Command as ImportTemporalV1
+    ok("CMD-11 : import_google_temporal_v1.Command importable (snapshots V1 GEE)")
 except Exception as e:
-    fail("CMD-11 : import_google_buildings import", traceback.format_exc()[-300:])
+    fail("CMD-11 : import_google_temporal_v1 import", traceback.format_exc()[-300:])
 
 # CMD-12 : import_sentinel_api importable
 try:
@@ -220,7 +192,7 @@ try:
     import ast
     cmd_path = os.path.join(os.path.dirname(os.path.dirname(os.path.abspath(__file__))),
                             "module1_urbanisme", "management", "commands", "run_detection.py")
-    with open(cmd_path) as f:
+    with open(cmd_path, encoding='utf-8', errors='replace') as f:
         content = f.read()
     # Chercher la duplication du bloc raster_transform
     count = content.count('ndbi_results["raster_transform"] = src.transform')

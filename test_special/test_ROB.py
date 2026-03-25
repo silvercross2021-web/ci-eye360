@@ -139,18 +139,18 @@ try:
 except Exception as e:
     fail("ROB-08 : /api/detections-geojson/ robustesse", traceback.format_exc()[-300:])
 
-# ROB-09 : import_microsoft._is_in_bbox() avec géométrie invalide
+# ROB-09 : import_google_buildings — BBOX valide (remplacement import_microsoft supprimé)
 try:
-    from module1_urbanisme.management.commands.import_microsoft import Command
-    cmd = Command()
-    bbox = {"min_lon": -4.03, "min_lat": 5.28, "max_lon": -3.97, "max_lat": 5.32}
-    # Feature sans géométrie
-    assert cmd._is_in_bbox({}, bbox) == False
-    assert cmd._is_in_bbox({"geometry": {}}, bbox) == False
-    assert cmd._is_in_bbox({"geometry": {"type": "Point", "coordinates": [-4.0, 5.3]}}, bbox) == False
-    ok("ROB-09 : import_microsoft._is_in_bbox() géométries invalides → False OK")
+    from module1_urbanisme.management.commands.import_google_buildings import TREICHVILLE_BBOX, MIN_CONFIDENCE
+    minlon, minlat, maxlon, maxlat = TREICHVILLE_BBOX
+    assert maxlon > minlon, f"maxLon ({maxlon}) <= minLon ({minlon})"
+    assert maxlat > minlat, f"maxLat ({maxlat}) <= minLat ({minlat})"
+    assert -5.0 < minlon < -3.5, f"minLon hors Abidjan: {minlon}"
+    assert 5.0 < minlat < 5.5, f"minLat hors Abidjan: {minlat}"
+    assert 0.6 <= MIN_CONFIDENCE <= 0.8, f"MIN_CONFIDENCE hors plage: {MIN_CONFIDENCE}"
+    ok(f"ROB-09 : import_google_buildings BBOX {TREICHVILLE_BBOX} et MIN_CONFIDENCE={MIN_CONFIDENCE} valides")
 except Exception as e:
-    fail("ROB-09 : _is_in_bbox() géométries invalides", traceback.format_exc()[-300:])
+    fail("ROB-09 : import_google_buildings BBOX robustesse", traceback.format_exc()[-300:])
 
 # ROB-10 : NDBICalculator.compute_confidence() valeurs extrêmes
 try:

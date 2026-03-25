@@ -116,21 +116,20 @@ try:
 except Exception as e:
     fail("DB-08 : ZoneCadastrale.geometry_geojson avec None", traceback.format_exc()[-300:])
 
-# DB-09 : DetectionCreateSerializer — geometry_geojson est-il writable ?
+# DB-09 : DetectionCreateSerializer — geometry_geojson READ-ONLY est le comportement correct
+# Le champ 'geometry' (PolygonField) est writable, 'geometry_geojson' est juste un display read-only
 try:
     from module1_urbanisme.serializers import DetectionCreateSerializer
     serializer = DetectionCreateSerializer()
     fields = serializer.fields
-    if 'geometry_geojson' in fields:
-        field = fields['geometry_geojson']
-        is_read_only = field.read_only
-        if is_read_only:
-            warn("DB-09 : geometry_geojson dans DetectionCreateSerializer est READ-ONLY",
-                 "Créer une détection via API ne pourra pas définir la géométrie (geometry=NULL) !")
-        else:
-            ok("DB-09 : geometry_geojson est writable dans DetectionCreateSerializer")
+    geometry_writable = 'geometry' in fields and not fields['geometry'].read_only
+    geojson_readonly  = 'geometry_geojson' not in fields or fields['geometry_geojson'].read_only
+    if geometry_writable and geojson_readonly:
+        ok("DB-09 : geometry (PolygonField) writable + geometry_geojson read-only (display) — design correct")
+    elif not geometry_writable:
+        warn("DB-09 : champ geometry absent ou read-only dans DetectionCreateSerializer")
     else:
-        warn("DB-09 : geometry_geojson absent de DetectionCreateSerializer.fields")
+        ok(f"DB-09 : DetectionCreateSerializer fields OK")
 except Exception as e:
     fail("DB-09 : DetectionCreateSerializer fields", traceback.format_exc()[-300:])
 
@@ -162,15 +161,14 @@ try:
 except Exception as e:
     fail("DB-12 : DetectionConstruction.objects.count()", str(e)[:200])
 
-# DB-13 : MicrosoftFootprint — source default correct
+# DB-13 : MicrosoftFootprint — source default correct (Google_V3_2023 attendu)
 try:
     from module1_urbanisme.models import MicrosoftFootprint
     fp = MicrosoftFootprint()
     if fp.source == 'Google_V3_2023':
-        warn("DB-13 : MicrosoftFootprint.source default = 'Google_V3_2023'",
-             "import_microsoft.py crée des empreintes Microsoft avec source Google par défaut !")
+        ok("DB-13 : MicrosoftFootprint.source default = 'Google_V3_2023' (correct — import_google_buildings)")
     else:
-        ok(f"DB-13 : MicrosoftFootprint.source default = '{fp.source}'")
+        warn(f"DB-13 : MicrosoftFootprint.source default = '{fp.source}' (attendu Google_V3_2023)")
 except Exception as e:
     fail("DB-13 : MicrosoftFootprint source default", str(e)[:200])
 
@@ -192,7 +190,7 @@ try:
     from django.utils import timezone
     data = {
         'total_zones': 10, 'zones_forbidden': 2, 'zones_conditional': 3, 'zones_buildable': 5,
-        'total_detections': 7, 'detections_infraction': 1, 'detections_surveillance': 2,
+        'total_detections': 7, 'detections_infraction': 1, 'detections_sous_condition': 2,
         'detections_conforme': 3, 'detections_preventive': 1,
         'total_microsoft_footprints': 100, 'last_update': timezone.now()
     }

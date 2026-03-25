@@ -6,7 +6,7 @@ import os, sys, subprocess, json
 TEST_DIR = os.path.dirname(os.path.abspath(__file__))
 ROOT_DIR = os.path.dirname(TEST_DIR)
 
-SUITES = ["test_ENV", "test_DB", "test_PIPE", "test_API", "test_WEB", "test_CMD", "test_ROB", "test_CIV"]
+SUITES = ["test_ENV", "test_DB", "test_DB_REAL", "test_PIPE", "test_PIPE_REAL", "test_API", "test_WEB", "test_CMD", "test_ROB", "test_CIV"]
 
 GLOBAL = {"OK": 0, "WARN": 0, "FAIL": 0}
 

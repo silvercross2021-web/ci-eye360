@@ -16,7 +16,7 @@ import threading
 
 class SmartAutoAnalyzer:
     def __init__(self):
-        self.project_root = Path(__file__).parent
+        self.project_root = Path(__file__).parent.parent  # scripts/ → racine du projet
         self.errors_found = []
         self.fixes_applied = []
         self.server_process = None

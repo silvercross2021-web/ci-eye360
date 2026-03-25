@@ -138,10 +138,15 @@ class NDBICalculator:
                     denom = (swir_data + red_data) + (nir_data + blue_data)
                     formula_label = "BSI_complet ((B11+B04)-(B08+B02))/((B11+B04)+(B08+B02))"
                 else:
-                    # Formule simplifiée (sans B02)
-                    num   = swir_data - nir_data
-                    denom = swir_data + nir_data
-                    formula_label = "BSI_approx (B11-B08)/(B11+B08)"
+                    # Formule simplifiée (sans B02) — utilise B04 pour différencier du NDBI
+                    # BSI_approx = (B11 + B04 - B08) / (B11 + B04 + B08)
+                    with rasterio.open(b04_path) as red_src:
+                        red_data = red_src.read(1).astype(float)
+                        if red_data.shape != nir_data.shape:
+                            red_data = self._resample_to_match(red_src, nir_src)
+                    num   = (swir_data + red_data) - nir_data
+                    denom = (swir_data + red_data) + nir_data
+                    formula_label = "BSI_approx (B11+B04-B08)/(B11+B04+B08)"
 
                 with np.errstate(divide='ignore', invalid='ignore'):
                     bsi = np.where(denom == 0, 0.0, num / denom)

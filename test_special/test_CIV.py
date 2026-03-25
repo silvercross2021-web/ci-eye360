@@ -36,13 +36,12 @@ except Exception as e:
 
 TREICHVILLE_BBOX = {"min_lon": -4.03001, "min_lat": 5.28501, "max_lon": -3.97301, "max_lat": 5.32053}
 
-# CIV-01 : BBOX Treichville cohérente entre les modules
+# CIV-01 : BBOX Treichville cohérente entre les modules (SentinelDataFetcher vs import_google_buildings)
 try:
     from module1_urbanisme.pipeline.sentinel_data_fetcher import TREICHVILLE_BBOX as SDF_BBOX
-    from module1_urbanisme.management.commands.import_microsoft import DEFAULT_BBOX
     from module1_urbanisme.management.commands.import_google_buildings import TREICHVILLE_BBOX as GB_BBOX
 
-    # SDF_BBOX est un dict
+    # SDF_BBOX est un dict {min_lon, min_lat, max_lon, max_lat}
     sdf_lon_range = SDF_BBOX.get('max_lon', 0) - SDF_BBOX.get('min_lon', 0)
     # GB_BBOX est une liste [min_lon, min_lat, max_lon, max_lat]
     gb_lon_range = GB_BBOX[2] - GB_BBOX[0]
@@ -51,7 +50,7 @@ try:
         warn("CIV-01 : BBOXes Treichville légèrement différentes entre modules",
              f"SentinelDataFetcher: {SDF_BBOX}, GoogleBuildings: {GB_BBOX}")
     else:
-        ok(f"CIV-01 : BBOXes Treichville cohérentes (lon range ≈ {sdf_lon_range:.4f}°)")
+        ok(f"CIV-01 : BBOXes Treichville cohérentes (lon range ≈ {sdf_lon_range:.4f}° — import_microsoft supprimé, remplacé par import_google_buildings)")
 except Exception as e:
     fail("CIV-01 : BBOXes Treichville", traceback.format_exc()[-300:])
 

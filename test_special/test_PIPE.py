@@ -66,7 +66,7 @@ try:
         b11_path = os.path.join(tmpdir, "B11.tif")
         b04_path = os.path.join(tmpdir, "B04.tif")
         profile = {'driver': 'GTiff', 'height': 10, 'width': 10, 'count': 1,
-                   'dtype': 'float32', 'crs': 'EPSG:4326',
+                   'dtype': 'float32', 'crs': '+proj=longlat +datum=WGS84 +no_defs',
                    'transform': from_bounds(-4.03, 5.28, -3.97, 5.32, 10, 10)}
         with rasterio.open(b08_path, 'w', **profile) as dst: dst.write(arr_b08, 1)
         with rasterio.open(b11_path, 'w', **profile) as dst: dst.write(arr_b11, 1)

@@ -14,7 +14,7 @@ from pathlib import Path
 
 class AutoFixVerify:
     def __init__(self):
-        self.project_root = Path(__file__).parent
+        self.project_root = Path(__file__).parent.parent  # scripts/ → racine du projet
         self.errors_found = []
         self.fixes_applied = []
         
