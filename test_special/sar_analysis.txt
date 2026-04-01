@@ -1,0 +1,44 @@
+
+==============================================
+🔎 ANALYSE MINUTIEUSE DE : test_special/outputs/SAR_VV_2024.tif
+==============================================
+📐 1. MÉTADONNÉES SPATIALES :
+   - Dimensions (Pixels) : 635 x 396 (Shape: (396, 635))
+   - Système de projection (CRS) : GEOGCS["WGS 84",DATUM["World Geodetic System 1984",SPHEROID["WGS 84",6378137,298.257223563]],PRIMEM["Greenwich",0],UNIT["degree",0.0174532925199433,AUTHORITY["EPSG","9122"]],AXIS["Latitude",NORTH],AXIS["Longitude",EAST]]
+   - Bounding Box : BoundingBox(left=-4.030022027616997, bottom=5.284968479531969, right=-3.972979007075408, top=5.320541764783102)
+   - Taille d'un pixel (Degrés) : 0.000090 par 0.000090
+
+📊 2. VÉRIFICATION DES DONNÉES (Valeurs Radiométriques en dB) :
+   - Pixels Totaux : 251460
+   - Pixels Vides (NaN) : 0 (0.00%)
+   - Valeur Minimum : -28.08 dB
+   - Valeur Maximum : 25.61 dB
+   - Valeur Moyenne : -10.47 dB
+   - Valeur Médiane : -9.03 dB
+
+🧪 3. ANALYSE DE LA COHÉRENCE PHYSIQUE SAR :
+   ✅ COHÉRENT : Les valeurs sont dans l'échelle standard de rétrodiffusion radar (Sigma Nought dB).
+   ℹ️ Nombre de pixels très brillants (> 0 dB, potentiels bâtiments) : 13910 (5.53%)
+   ℹ️ Nombre de pixels très sombres (< -15 dB, potentielle eau calme) : 77774 (30.93%)
+
+==============================================
+🔎 ANALYSE MINUTIEUSE DE : test_special/outputs/SAR_VV_2025.tif
+==============================================
+📐 1. MÉTADONNÉES SPATIALES :
+   - Dimensions (Pixels) : 635 x 396 (Shape: (396, 635))
+   - Système de projection (CRS) : GEOGCS["WGS 84",DATUM["World Geodetic System 1984",SPHEROID["WGS 84",6378137,298.257223563]],PRIMEM["Greenwich",0],UNIT["degree",0.0174532925199433,AUTHORITY["EPSG","9122"]],AXIS["Latitude",NORTH],AXIS["Longitude",EAST]]
+   - Bounding Box : BoundingBox(left=-4.030022027616997, bottom=5.284968479531969, right=-3.972979007075408, top=5.320541764783102)
+   - Taille d'un pixel (Degrés) : 0.000090 par 0.000090
+
+📊 2. VÉRIFICATION DES DONNÉES (Valeurs Radiométriques en dB) :
+   - Pixels Totaux : 251460
+   - Pixels Vides (NaN) : 0 (0.00%)
+   - Valeur Minimum : -29.65 dB
+   - Valeur Maximum : 21.27 dB
+   - Valeur Moyenne : -10.45 dB
+   - Valeur Médiane : -8.97 dB
+
+🧪 3. ANALYSE DE LA COHÉRENCE PHYSIQUE SAR :
+   ✅ COHÉRENT : Les valeurs sont dans l'échelle standard de rétrodiffusion radar (Sigma Nought dB).
+   ℹ️ Nombre de pixels très brillants (> 0 dB, potentiels bâtiments) : 14405 (5.73%)
+   ℹ️ Nombre de pixels très sombres (< -15 dB, potentielle eau calme) : 76082 (30.26%)

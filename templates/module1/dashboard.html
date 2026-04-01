@@ -532,7 +532,7 @@
         <div class="sidebar-left interactive">
             <div class="filter-group">
                 <div class="cyber-btn active" onclick="showAllDetections(); setActive(this)"
-                    data-tooltip="FILTRES (SURVOLEZ POUR AFFICHER)">
+                    data-tooltip="FILTRES ALERTE (SURVOLEZ)">
                     <i class="fas fa-layer-group"></i>
                 </div>
                 <div class="filter-options">
@@ -554,6 +554,30 @@
                     </div>
                 </div>
             </div>
+            
+            <div style="height: 5px;"></div>
+            
+            <div class="filter-group">
+                <div class="cyber-btn active" onclick="showAllDetections(); setActive(this)"
+                    data-tooltip="FILTRES CONFIANCE (SURVOLEZ)">
+                    <i class="fas fa-percentage"></i>
+                </div>
+                <div class="filter-options">
+                    <div class="cyber-btn" onclick="filterByConfidence(90); setActive(this)"
+                        style="color:#00FF88; border-color:rgba(0,255,136,0.3); font-size:12px; font-weight:bold" data-tooltip="CONFIANCE ≥ 90%">
+                        &ge;90%
+                    </div>
+                    <div class="cyber-btn" onclick="filterByConfidence(75); setActive(this)"
+                        style="color:#fd7e14; border-color:rgba(253,126,20,0.3); font-size:12px; font-weight:bold" data-tooltip="CONFIANCE ≥ 75%">
+                        &ge;75%
+                    </div>
+                    <div class="cyber-btn" onclick="filterByConfidence(50); setActive(this)"
+                        style="color:#FF4444; border-color:rgba(255,68,68,0.3); font-size:12px; font-weight:bold" data-tooltip="CONFIANCE ≥ 50%">
+                        &ge;50%
+                    </div>
+                </div>
+            </div>
+
             <div style="height: 10px;"></div>
             <div class="cyber-btn btn-blue active" id="btn-cadastre" onclick="toggleCadastre()"
                 data-tooltip="AFFICHER/MASQUER CADASTRE">
@@ -776,8 +800,12 @@
         }
 
         function setActive(element) {
-            document.querySelectorAll('.sidebar-left .cyber-btn').forEach(btn => btn.classList.remove('active'));
-            element.classList.add('active');
+            // Uniquement enlever la classe active des sous-boutons de filtre, 
+            // pour ne pas désactiver visuellement le bouton Cadastre ni les icônes parents.
+            document.querySelectorAll('.filter-options .cyber-btn').forEach(btn => btn.classList.remove('active'));
+            if (element && element.parentNode && element.parentNode.classList.contains('filter-options')) {
+                element.classList.add('active');
+            }
         }
 
         // Helper: apply style to a layer that might be L.geoJSON (has eachLayer) or L.rectangle
@@ -831,6 +859,23 @@
                         opacity: isGreen ? 1 : 0.06,
                         fillOpacity: isGreen ? 0.4 : 0.02
                     });
+                });
+            }
+        }
+
+        function filterByConfidence(minPct) {
+            if (detectionsLayer) {
+                detectionsLayer.eachLayer(layer => {
+                    const p = layer.feature.properties;
+                    const confPct = p.confidence ? Math.round(p.confidence * 100) : 0;
+                    const level = layer._alertLevel;
+                    
+                    if (confPct >= minPct) {
+                        const fi = level === 'rouge' ? 0.45 : level === 'orange' ? 0.35 : 0.25;
+                        applyLayerStyle(layer, { opacity: 1, fillOpacity: fi });
+                    } else {
+                        applyLayerStyle(layer, { opacity: 0.06, fillOpacity: 0.02 });
+                    }
                 });
             }
         }

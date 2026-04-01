@@ -150,10 +150,17 @@ try:
         
         ok(f"PIPE_REAL-05 : SCL T2 — nuages/ombres : {pct_cloud:.1f}% | eau : {pct_water:.1f}% | valides : {pct_valid:.1f}%")
         
-        if pct_valid < 50:
-            fail(f"PIPE_REAL-05 : Seulement {pct_valid:.0f}% pixels valides après masque SCL — image trop nuageuse !")
-        elif pct_valid < 70:
-            warn(f"PIPE_REAL-05 : {pct_valid:.0f}% pixels valides — couverture nuageuse significative")
+        # Évaluer UNIQUEMENT la couverture nuageuse pour les seuils FAIL/WARN.
+        # L'eau (lagune Ébrié) est permanente à Treichville (~35% de la zone image)
+        # → ce n'est pas un problème de qualité d'image, c'est la géographie d'Abidjan.
+        if pct_cloud > 50:
+            fail(f"PIPE_REAL-05 : {pct_cloud:.0f}% pixels nuageux — image inutilisable pour la détection !")
+        elif pct_cloud > 20:
+            warn(f"PIPE_REAL-05 : {pct_cloud:.0f}% pixels nuageux/ombres — couverture nuageuse élevée")
+        else:
+            ok(f"PIPE_REAL-05 : Couverture nuageuse {pct_cloud:.1f}% — image exploitable ✅")
+            if pct_water > 25:
+                ok(f"PIPE_REAL-05 : Eau (lagune Ébrié) : {pct_water:.1f}% — géographie normale pour Treichville/Abidjan")
 except Exception as e:
     fail("PIPE_REAL-05 : Masquage SCL", traceback.format_exc()[-300:])
 
@@ -212,33 +219,30 @@ except Exception as e:
 # ── PIPE_REAL-08 : verification_4_couches sur une vraie détection ─────────────
 try:
     from module1_urbanisme.models import DetectionConstruction
-    from module1_urbanisme.pipeline.verification_4_couches import DetectionPipeline
-    
+    from module1_urbanisme.pipeline.verification_4_couches import Verification4Couches
+
     # Prendre la première détection en base comme cas de test
     sample = DetectionConstruction.objects.filter(geometry__isnull=False).first()
     if not sample:
         warn("PIPE_REAL-08 : Aucune détection avec géométrie — test ignoré")
     else:
-        pipeline = DetectionPipeline()
-        region = {
-            'centroid': (200, 300),
-            'size_pixels': int(sample.surface_m2 / 100) if sample.surface_m2 else 10,
-            'bbox': (195, 295, 205, 305),
-            'change_type': 'new_construction',
-            'ndbi_t1': sample.ndbi_t1,
-            'ndbi_t2': sample.ndbi_t2,
-            'bsi': sample.bsi_value or 0.2,
-            'geometry_geojson': sample.geometry_geojson,
-            'confidence': sample.confidence,
-        }
-        result = pipeline.verify_detection(region)
-        ok(f"PIPE_REAL-08 : verify_detection() → status='{result.get('status')}' conf={result.get('confidence', 0):.3f}")
-        
-        layers = result.get('layers_checked', [])
-        ok(f"PIPE_REAL-08 : Couches vérifiées : {layers}")
-        
-        if len(layers) < 2:
-            warn(f"PIPE_REAL-08 : Seulement {len(layers)} couche(s) vérifiée(s) (attendu 4)")
+        # verify_detection() est sur Verification4Couches, pas sur DetectionPipeline
+        verifier = Verification4Couches()
+        surface_m2 = sample.surface_m2 or 400.0
+        result = verifier.verify_detection(
+            geometry_geojson=sample.geometry_geojson,
+            ndbi_t1_val=sample.ndbi_t1,
+            ndbi_t2_val=sample.ndbi_t2,
+            bsi_val=sample.bsi_value,
+            change_type='new_construction',
+            confidence_ia=sample.confidence,
+            surface_m2=surface_m2,
+        )
+        if result is None:
+            warn("PIPE_REAL-08 : verify_detection() → None (filtré par 4 couches — normal si bâtiment pré-existant ou faux positif)")
+        else:
+            ok(f"PIPE_REAL-08 : verify_detection() → status='{result.get('status')}' conf={result.get('confidence', 0):.3f}")
+            ok(f"PIPE_REAL-08 : Cas Google Buildings : {result.get('google_case', 'N/A')}")
 except Exception as e:
     fail("PIPE_REAL-08 : verification_4_couches réel", traceback.format_exc()[-300:])
 

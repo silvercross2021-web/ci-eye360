@@ -124,24 +124,42 @@ def verify_prerequisites(date_t1, date_t2):
 
     all_ok = True
 
-    # Images Sentinel
-    imgs = {str(img.date_acquisition): img for img in ImageSatellite.objects.all()}
+    # Images Sentinel — AUTO-ACQUISITION SI MANQUANT
+    imgs_in_db = {str(img.date_acquisition): img for img in ImageSatellite.objects.all()}
+    missing_dates = [d for d in [date_t1, date_t2] if d not in imgs_in_db]
+
+    if missing_dates:
+        info(f"Données Sentinel manquantes pour : {missing_dates}")
+        info("  🔄 Tentative d'auto-acquisition via API (CDSE Copernicus Gratuit)...")
+        for d in missing_dates:
+            try:
+                # Appelle la commande d'import API automatiquement
+                call_command('import_sentinel_api', date=d)
+                ok(f"Acquisition réussie pour {d}")
+            except Exception as e:
+                fail(f"Échec de l'auto-acquisition pour {d} : {e}")
+                all_ok = False
+        
+        # Rafraîchir la liste après acquisition
+        imgs_in_db = {str(img.date_acquisition): img for img in ImageSatellite.objects.all()}
+
     for d in [date_t1, date_t2]:
-        if d in imgs:
-            img = imgs[d]
+        if d in imgs_in_db:
+            img = imgs_in_db[d]
             b = list(img.bands.keys()) if img.bands else []
             scl = "SCL OK" if (img.classification_map and os.path.exists(str(img.classification_map))) else "SCL absent"
             ok(f"ImageSatellite {d} — Bandes : {b} | {scl}")
-        else:
-            fail(f"ImageSatellite {d} absente en base")
-            fail("  → Lancer : python manage.py import_sentinel")
-            all_ok = False
 
-    # Vérification des fichiers TIF sur disque
-    for d, img in [(d, imgs[d]) for d in [date_t1, date_t2] if d in imgs]:
-        for band, path in (img.bands or {}).items():
-            if not os.path.exists(path):
-                fail(f"Fichier TIF manquant : {band}/{d} → {path}")
+    # Vérification des fichiers TIF sur disque (et retéléchargement si besoin)
+    for d, img in [(d, imgs_in_db[d]) for d in [date_t1, date_t2] if d in imgs_in_db]:
+        paths_exist = [os.path.exists(str(p)) for p in (img.bands or {}).values()]
+        if not all(paths_exist):
+            warn(f"Certains fichiers TIF manquent pour {d} sur le disque. Tentative de restauration...")
+            try:
+                call_command('import_sentinel_api', date=d)
+                ok(f"Fichiers restaurés pour {d}")
+            except Exception as e:
+                fail(f"Impossible de restaurer les fichiers pour {d} : {e}")
                 all_ok = False
 
     # Google V3 footprints

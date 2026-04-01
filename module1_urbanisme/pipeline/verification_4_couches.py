@@ -106,6 +106,14 @@ class Verification4Couches:
                 )
                 return None
 
+            # ── CORRECTIF : CAS SPÉCIAL INFRASTRUCTURES (Ponts) ────────
+            # Les embouteillages ou le soleil sur le bitume des grands ponts (De Gaulle, HKB)
+            # créent des pics NDBI. Le Radar confirme car c'est du métal/béton.
+            # Google Buildings l'ignore car ce n'est pas un 'bâtiment'.
+            if self._is_on_bridge_or_water_infrastructure(geometry_geojson):
+                self.logger.info(f"❌ Couche 1 CAS INFRASTRUCTURE : Faux positif bloqué sur un Pont.")
+                return None
+
             # Si bâtiment connu et détecté comme nouvelle construction → reclasser
             if present_in_buildings and change_type == 'new_construction' and google_confidence >= 0.75:
                 self.logger.info(
@@ -247,6 +255,28 @@ class Verification4Couches:
         """
         result = self._check_google_buildings(geometry_geojson)
         return result["found"]
+
+    def _is_on_bridge_or_water_infrastructure(self, geometry_geojson: str) -> bool:
+        """
+        Filtre spatial dur pour les infrastructures majeures (Ponts d'Abidjan)
+        qui génèrent de massifs faux positifs à cause du trafic et du métal.
+        """
+        try:
+            geom = GEOSGeometry(geometry_geojson)
+            lng, lat = geom.centroid.x, geom.centroid.y
+            
+            # Pont Général-de-Gaulle & Pont Houphouët-Boigny
+            if -4.018 < lng < -4.005 and 5.310 < lat < 5.326:
+                return True
+                
+            # Pont HKB (Toll Bridge)
+            if -3.985 < lng < -3.972 and 5.318 < lat < 5.328:
+                return True
+                
+            return False
+        except Exception as e:
+            self.logger.error(f"Erreur d'exclusion pont : {e}")
+            return False
 
     # ─────────────────────────────────────────────────────────────────────
     # COUCHE 2/3 — Validation du changement spectral
