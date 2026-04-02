@@ -26,6 +26,7 @@ from typing import Dict, List, Optional
 from django.db.models import Q
 from django.contrib.gis.geos import GEOSGeometry  # ← NOUVEAU POUR POSTGIS
 from module1_urbanisme.models import ZoneCadastrale, MicrosoftFootprint, DetectionConstruction
+from module1_urbanisme.pipeline.google_v1_client import GoogleV1Client
 
 logger = logging.getLogger(__name__)
 
@@ -46,6 +47,7 @@ class Verification4Couches:
 
     def __init__(self):
         self.logger = logger
+        self.google_v1 = GoogleV1Client()
 
     def verify_detection(
         self,
@@ -92,12 +94,19 @@ class Verification4Couches:
             confidence_adjustment = google_result["confidence_adjustment"]
             confidence_ia = max(0.0, min(1.0, confidence_ia + confidence_adjustment))
 
-            # CAS 4 : Bâtiment certain pré-existant → faux positif
-            if google_case == "FAUX_POSITIF_PRE_EXISTANT":
-                self.logger.info(
-                    f"❌ Couche 1 CAS 4 : Bâtiment Google V3 >= 0.75, pré-existant → FAUX POSITIF"
-                )
-                return None
+            # CAS 4 : Bâtiment certain pré-existant → filtrer si on cherche une nouvelle construction
+            # Mais seulement si le bâtiment était déjà "vu" par Sentinel en T1 (NDBI_T1 élevé)
+            if google_case == "FAUX_POSITIF_PRE_EXISTANT" and change_type == 'new_construction':
+                if ndbi_t1_val > 0.15: # Bâtiment déjà présent au NDBI en 2024
+                    self.logger.info(
+                        f"❌ Couche 1 CAS 4 : Bâtiment Google V3 >= 0.75 ET NDBI_T1={ndbi_t1_val:.2f} → REJET (Déjà là)"
+                    )
+                    return None
+                else:
+                    # Cas d'une extension ou d'un bâtiment May 2023 non résolu par Sentinel en 2024
+                    self.logger.info(
+                        f"ℹ️ Couche 1 : Bâtiment Google V3 mais NDBI_T1 faible ({ndbi_t1_val:.2f}) → Modification suspectée"
+                    )
 
             # CAS 3 : Pas de bâtiment Google + NDBI/BSI incohérents
             if google_case == "FAUX_POSITIF_INCOHERENT":
@@ -106,20 +115,13 @@ class Verification4Couches:
                 )
                 return None
 
-            # ── CORRECTIF : CAS SPÉCIAL INFRASTRUCTURES (Ponts) ────────
-            # Les embouteillages ou le soleil sur le bitume des grands ponts (De Gaulle, HKB)
-            # créent des pics NDBI. Le Radar confirme car c'est du métal/béton.
-            # Google Buildings l'ignore car ce n'est pas un 'bâtiment'.
-            if self._is_on_bridge_or_water_infrastructure(geometry_geojson):
-                self.logger.info(f"❌ Couche 1 CAS INFRASTRUCTURE : Faux positif bloqué sur un Pont.")
-                return None
-
-            # Si bâtiment connu et détecté comme nouvelle construction → reclasser
-            if present_in_buildings and change_type == 'new_construction' and google_confidence >= 0.75:
-                self.logger.info(
-                    f"ℹ️ Couche 1 : Bâtiment Google V3 (conf={google_confidence:.2f}) → reclassification"
-                )
-                change_type = 'soil_activity'
+            # Si bâtiment connu et détecté comme nouvelle construction → laisser au zonage
+            # le soin de reclasser en "Modification" (permet de garder les seuils spectraux bâti)
+            # if present_in_buildings and change_type == 'new_construction' and google_confidence >= 0.75:
+            #     self.logger.info(
+            #         f"ℹ️ Couche 1 : Bâtiment Google V3 (conf={google_confidence:.2f}) → reclassification"
+            #     )
+            #     change_type = 'soil_activity'
 
             # ── Couche 2 : Vérification Sentinel T1 ────────────────────
             t1_limit = 0.2 if confidence_ia < 0.8 else 0.50
@@ -150,6 +152,29 @@ class Verification4Couches:
                 classification['verification_required'] = google_result.get(
                     'verification_required', False
                 )
+
+                # ── Couche 5 : Arbitrage Temporel V1 (Expert P4) ────────────
+                # Si alerte critique et pas de bâtiment V3 → demander à la V1
+                # Évite les erreurs sur les bâtiments construits entre 2016 et 2023
+                # mais ratés par la segmentation V3.
+                if classification['alert_level'] == 'rouge' and not present_in_buildings:
+                    self.logger.info(f"⚖️ Tribunal V1 : Interrogation historique (GEE) pour alerte rouge...")
+                    coords = self._get_centroid(geometry_geojson)
+                    v1_res = self.google_v1.check_presence(coords['lon'], coords['lat'], "2024-02-15")
+                    
+                    if v1_res['found']:
+                        self.logger.info(
+                            f"Verdict V1 : Pas une infraction (Déjà là en {v1_res['date_snapshot']}) → Déclassement"
+                        )
+                        classification['status'] = 'conforme'
+                        classification['alert_level'] = 'vert'
+                        classification['message'] = (
+                            f"Bâtiment historiquement présent (V1 {v1_res['date_snapshot']}) - "
+                            f"confirmé par Google Earth Engine. Alerte rouge annulée par arbitrage V1."
+                        )
+                    else:
+                        self.logger.info(f"⚖️ Verdict V1 : Zone vide confirmée → Maintien Alerte Rouge")
+
             return classification
 
         except Exception as e:
@@ -177,15 +202,16 @@ class Verification4Couches:
             candidate_geom = GEOSGeometry(geometry_geojson)
             centroid = candidate_geom.centroid
             
-            # ST_DWithin 15m autour du centroïde (PostGIS, en mètres si geom SRID=4326)
-            # Note : pour SRID 4326, dwithin utilise des degrés,
-            # on convertit 15m → ~0.000135 degrés à latitude 5.3°N
-            radius_degrees = GOOGLE_SEARCH_RADIUS_M / 111320.0  # ~0.000135°
+            # ST_DWithin 15m autour du centroïde (PostGIS)
+            # Correction géodésique pour latitude Abidjan (5.3°N)
+            # 1 degré latitude ≈ 110580m, 1 degré longitude ≈ 110850m
+            # On utilise une moyenne conservatrice pour le rayon
+            radius_degrees = GOOGLE_SEARCH_RADIUS_M / 110850.0  # ~0.000135°
             
             nearby_buildings = (
                 MicrosoftFootprint.objects
                 .filter(geometry__dwithin=(centroid, radius_degrees))
-                .order_by()  # remove default ordering for performance
+                .order_by('-confidence_score')  # PRIORITÉ AU BÂTIMENT LE PLUS FIABLE (BUG#21)
             )
             
             if not nearby_buildings.exists():
@@ -255,28 +281,6 @@ class Verification4Couches:
         """
         result = self._check_google_buildings(geometry_geojson)
         return result["found"]
-
-    def _is_on_bridge_or_water_infrastructure(self, geometry_geojson: str) -> bool:
-        """
-        Filtre spatial dur pour les infrastructures majeures (Ponts d'Abidjan)
-        qui génèrent de massifs faux positifs à cause du trafic et du métal.
-        """
-        try:
-            geom = GEOSGeometry(geometry_geojson)
-            lng, lat = geom.centroid.x, geom.centroid.y
-            
-            # Pont Général-de-Gaulle & Pont Houphouët-Boigny
-            if -4.018 < lng < -4.005 and 5.310 < lat < 5.326:
-                return True
-                
-            # Pont HKB (Toll Bridge)
-            if -3.985 < lng < -3.972 and 5.318 < lat < 5.328:
-                return True
-                
-            return False
-        except Exception as e:
-            self.logger.error(f"Erreur d'exclusion pont : {e}")
-            return False
 
     # ─────────────────────────────────────────────────────────────────────
     # COUCHE 2/3 — Validation du changement spectral
@@ -415,20 +419,35 @@ class Verification4Couches:
                 'confidence': 0.85 if present_microsoft else 0.8,
             }
 
-        # CAS 3 — DÉVELOPPEMENT CONFORME (Notification Verte)
+        # CAS 3 — DÉVELOPPEMENT CONFORME OU EXTENSION
         elif zone_status == 'buildable':
-            return {
-                'status': 'conforme',
-                'alert_level': 'vert',
-                'message': (
-                    f"{type_str} en Zone Constructible ({zone.name}). "
-                    f"Développement urbain conforme au zonage. Enregistrement sans alerte."
-                ),
-                'zone_id': zone.zone_id,
-                'zone_name': zone.name,
-                'zone_type': zone.zone_type,
-                'confidence': 0.75 if present_microsoft else 0.7,
-            }
+            if present_microsoft:
+                return {
+                    'status': 'sous_condition',
+                    'alert_level': 'orange',
+                    'message': (
+                        f"Extension ou surélévation détectée sur bâtiment existant ({zone.name}). "
+                        f"Même en Zone Constructible, une modification structurelle majeure "
+                        f"nécessite la validation d'un nouveau permis de construire."
+                    ),
+                    'zone_id': zone.zone_id,
+                    'zone_name': zone.name,
+                    'zone_type': zone.zone_type,
+                    'confidence': 0.8,
+                }
+            else:
+                return {
+                    'status': 'conforme',
+                    'alert_level': 'vert',
+                    'message': (
+                        f"Nouvelle construction détectée en Zone Constructible ({zone.name}). "
+                        f"Développement urbain conforme au zonage. Enregistrement sans alerte."
+                    ),
+                    'zone_id': zone.zone_id,
+                    'zone_name': zone.name,
+                    'zone_type': zone.zone_type,
+                    'confidence': 0.7,
+                }
 
         # Cas par défaut (statut inconnu)
         else:
@@ -508,6 +527,16 @@ class Verification4Couches:
             'zone_type': zone.zone_type,
             'confidence': conf,
         }
+
+    def _get_centroid(self, geometry_geojson: str) -> Dict[str, float]:
+        """Calcul robuste du centroïde WGS84 via GEOS."""
+        try:
+            geom = GEOSGeometry(geometry_geojson)
+            centroid = geom.centroid
+            return {'lon': centroid.x, 'lat': centroid.y}
+        except Exception as e:
+            self.logger.error(f"Erreur calcul centroïde: {e}")
+            return {'lon': 0, 'lat': 0}
 
 
 # Pipeline de création d'enregistrements

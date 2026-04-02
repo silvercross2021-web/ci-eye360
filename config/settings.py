@@ -110,9 +110,9 @@ WSGI_APPLICATION = "config.wsgi.application"
 # https://docs.djangoproject.com/en/5.2/ref/settings/#databases
 
 # ── CONFIGURATION BASE DE DONNÉES POSTGIS ──
-# B5 : Utilise DATABASE_URL du .env si présente, sinon SQLite par défaut.
+# B5 : Utilise DATABASE_URL du .env impérativement (PostgreSQL/PostGIS)
 DATABASES = {
-    'default': env.db('DATABASE_URL', default=f'sqlite:///{BASE_DIR / "db.sqlite3"}')
+    'default': env.db('DATABASE_URL')
 }
 
 if DATABASES['default']['ENGINE'] == 'django.contrib.gis.db.backends.postgis':

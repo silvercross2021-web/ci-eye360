@@ -13,9 +13,18 @@ AMÉLIORATIONS APPORTÉES :
   - L6 : Utilisation du fichier SCL pour masquer les pixels nuageux
 """
 
+import os
+import sys
+
+# Configuration GDAL pour Windows (via PostgreSQL 16)
+if os.name == 'nt':
+    POSTGRES_BIN = r"C:\Program Files\PostgreSQL\16\bin"
+    os.environ['PATH'] = POSTGRES_BIN + os.pathsep + os.environ.get('PATH', '')
+    os.environ['GDAL_LIBRARY_PATH'] = os.path.join(POSTGRES_BIN, 'libgdal-34.dll')
+    os.environ['GEOS_LIBRARY_PATH'] = os.path.join(POSTGRES_BIN, 'libgeos_c.dll')
+
 import json
 import logging
-import sys
 from datetime import date, datetime, timedelta
 
 import numpy as np
@@ -324,27 +333,18 @@ class Command(BaseCommand):
                     image_t1, image_t2, threshold_built, threshold_soil
                 )
 
-            # ── Intégration Phase 7 : Fusion Sentinel-1 SAR (Data Fusion) ──
+            # ── Intégration Phase 7 : Fusion Sentinel-1 SAR ─────────────────
             if use_sar:
-                self.stdout.write("\n📡 Étape 1.5 : Acquisition Radar Sentinel-1 (Cloud-Piercing / Data Fusion)...")
+                self.stdout.write("\n📡 Étape 1.5 : Acquisition Radar Sentinel-1 (Cloud-Piercing)...")
                 try:
-                    from module1_urbanisme.pipeline.sentinel1_sar import fetch_and_evaluate_sar_for_bbox
-                    
-                    # On récupère les dates exactes ou par défaut
-                    d1_str = str(image_t1.date_acquisition)
-                    d2_str = str(image_t2.date_acquisition)
-                    
-                    self.stdout.write(f"   Demande GEE pour les dates {d1_str} et {d2_str}...")
-                    sar_info = fetch_and_evaluate_sar_for_bbox(None, "TREICHVILLE", d1_str, d2_str)
-                    
+                    from module1_urbanisme.pipeline.sentinel1_sar import fetch_and_evaluate_sar_for_bbox, merge_optical_and_sar_masks
+                    sar_info = fetch_and_evaluate_sar_for_bbox(None, "TREICHVILLE", date_t1, date_t2)
                     self.stdout.write(f"   ℹ️ {sar_info['message']}")
-                    if sar_info.get("sar_detected"):
-                        # Injection de la matrice de bruit radar purifiée (Δ VV) dans les résultats NDBI
-                        # Cela servira au "Juge" lors de l'extraction (enrich_region)
-                        ndbi_results["sar_delta"] = sar_info["delta_vv_db"]
-                        
+                    # En cas de donnees SAR reelles, on executerait:
+                    # optical_mask = ndbi_results["changes"]["new_constructions"]
+                    # ndbi_results["changes"]["new_constructions"] = merge_optical_and_sar_masks(optical_mask, sar_mask)
                 except Exception as e:
-                    self.stdout.write(self.style.WARNING(f"   ⚠️ Erreur module SAR (GEE non configuré ?) : {e}"))
+                    self.stdout.write(self.style.WARNING(f"   ⚠️ Erreur module SAR : {e}"))
 
 
             # ── Étape 3 : Extraction des régions ─────────────────────────
@@ -635,7 +635,6 @@ class Command(BaseCommand):
         ndbi_t2 = ndbi_results["ndbi_t2"]
         bsi_t2 = ndbi_results.get("bsi_t2")
         cloud_pct = ndbi_results.get("cloud_pct", 0.0)
-        sar_delta = ndbi_results.get("sar_delta")
 
         all_regions = []
 
@@ -670,21 +669,9 @@ class Command(BaseCommand):
             else:
                 bsi_val = None
 
-            # ── DATA FUSION : Ajout du Radar SAR ──
-            if sar_delta is not None:
-                # Aligner sur le patch (le radar peut avoir qq pixels de décalage en bordure GEE)
-                max_r_sar = min(max_row, sar_delta.shape[0])
-                max_c_sar = min(max_col, sar_delta.shape[1])
-                sar_patch = sar_delta[min_row:max_r_sar, min_col:max_c_sar]
-                valid_sar = sar_patch[~np.isnan(sar_patch)]
-                sar_val = float(np.median(valid_sar)) if len(valid_sar) > 0 else 0.0
-            else:
-                sar_val = None
-
             region["ndbi_t1"] = ndbi_t1_val
             region["ndbi_t2"] = ndbi_t2_val
             region["bsi"]    = bsi_val
-            region["sar_delta"] = sar_val
             # ─────────────────────────────────────────────────────────────
 
             # L5 : score de confiance dynamique
@@ -698,25 +685,6 @@ class Command(BaseCommand):
             
             # TinyCD = mode expérimental. Poids entraînés sur images 0.5m (USA/Chine),
             # pas fiables sur Sentinel-2 10m (Afrique). Pas de bonus artificiel.
-            
-            # --- LA NOUVELLE LOGIQUE MÉTIER DE FUSION (DATA FUSION) ---
-            if sar_val is not None:
-                if sar_val >= 2.0 and change_type == "new_construction":
-                    # Cas 1: Optique voit Béton, et Radar tape fort contre des murs/métal (≥ 2.0 dB de hausse)
-                    # Certitude absolue ! On booste le score.
-                    conf = min(conf * 1.5, 1.0) 
-                    logger.info(f"🚀 FUSION: Radar CONFIRME bâtiment (+{sar_val:.1f} dB). Confiance: {conf*100:.0f}%")
-                elif sar_val <= 0.0 and change_type == "new_construction":
-                    # Cas 2: Optique voit Béton, MAIS Radar glisse tout droit (≤ 0 dB, donc plat)
-                    # Probablement route, parking, ou fondation. 
-                    # Suite à ta demande, on SUPPRIME purement la donnée de la base !
-                    logger.info(f"❌ FUSION: Radar INVALIDE le volume ({sar_val:.1f} dB). Faux positif Optique supprimé.")
-                    return None
-                elif sar_val >= 3.0 and change_type == "new_construction" and cloud_pct > 20:
-                    # Cas 3: Perce Nuage. Fort nuage en Optique, mais Radar puissant
-                    conf = min(conf * 2.0, 1.0)
-                    logger.info(f"☁️ FUSION: Radar Transperce les Nuages (+{sar_val:.1f} dB). Confiance: {conf*100:.0f}%")
-
             region["confidence"] = conf
             return region
 
@@ -725,18 +693,14 @@ class Command(BaseCommand):
             ndbi_results["changes"]["new_constructions"], min_region_size
         )
         for region in construction_regions:
-            enriched = enrich_region(region, "new_construction")
-            if enriched is not None:
-                all_regions.append(enriched)
+            all_regions.append(enrich_region(region, "new_construction"))
 
         # Régions terrassement
         soil_regions = calc.extract_change_regions(
             ndbi_results["changes"]["soil_activity"], min_region_size
         )
         for region in soil_regions:
-            enriched = enrich_region(region, "soil_activity")
-            if enriched is not None:
-                all_regions.append(enriched)
+            all_regions.append(enrich_region(region, "soil_activity"))
 
         # Régions démolitions (L1 — NOUVEAU)
         if "demolished" in ndbi_results["changes"]:
@@ -744,9 +708,7 @@ class Command(BaseCommand):
                 ndbi_results["changes"]["demolished"], min_region_size
             )
             for region in demolished_regions:
-                enriched = enrich_region(region, "demolition")
-                if enriched is not None:
-                    all_regions.append(enriched)
+                all_regions.append(enrich_region(region, "demolition"))
             self.stdout.write(
                 f"   → {len(demolished_regions)} démolitions potentielles détectées"
             )

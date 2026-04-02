@@ -203,7 +203,7 @@ def run_detection(mode, date_t1, date_t2, clear):
         warn(f"Suppression des détections existantes : {deleted} supprimée(s)")
 
     modes_to_run = []
-    if mode in ("ai", "both"):
+    if mode in ("kmeans", "ai", "both"):
         modes_to_run.append(("K-Means AI", {"use_ai": True}))
     if mode in ("tinycd", "both"):
         modes_to_run.append(("TinyCD Deep Learning", {"use_tinycd": True}))
@@ -449,7 +449,7 @@ def export_geojson(output_path):
 def parse_args():
     args = sys.argv[1:]
     opts = {
-        "mode": "ai",
+        "mode": "kmeans",
         "date_t1": DEFAULT_DATE_T1,
         "date_t2": DEFAULT_DATE_T2,
         "clear": False,
@@ -462,7 +462,10 @@ def parse_args():
     while i < len(args):
         a = args[i]
         if a == "--mode" and i + 1 < len(args):
-            opts["mode"] = args[i + 1]; i += 2
+            # On accepte 'kmeans', 'ai' ou 'tinycd'
+            mode_val = args[i + 1].lower()
+            if mode_val == "ai": mode_val = "kmeans"
+            opts["mode"] = mode_val; i += 2
         elif a == "--date-t1" and i + 1 < len(args):
             opts["date_t1"] = args[i + 1]; i += 2
         elif a == "--date-t2" and i + 1 < len(args):
